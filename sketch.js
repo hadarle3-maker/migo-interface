@@ -11,7 +11,7 @@ let videoFiles = {
   blob: "assets/videos/blob.webm",
   intro: "assets/videos/intro.mp4",
   introTo01: "assets/videos/intro_to_01.mp4",
-  scene01Hand: "assets/videos/scene01_hand.mp4"
+  scene01Hand: "assets/videos/secne01_hand.mp4"
 };
 
 function setup() {
