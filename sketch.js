@@ -87,17 +87,17 @@ const PRONOUN_TEXTS = [
   {
     label: "They",
     x: 1035.0757,
-    y: 180
+    y: 160
   },
   {
     label: "He",
     x: 610,
-    y: 510
+    y: 490
   },
   {
     label: "She",
     x: 1368.0696,
-    y: 490
+    y: 470
   }
 ];
 
