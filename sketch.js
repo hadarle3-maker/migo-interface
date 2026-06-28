@@ -11,8 +11,7 @@ let crossfadeStartTime = 0;
 let crossfadeDuration = 0.9;
 let crossfadeLead = 0.18;
 
-let crossfadeFrom = null;
-let crossfadeTo = [];
+let activeTransition = null;
 
 let handPose;
 let faceMesh;
@@ -48,6 +47,7 @@ let pronounClosedSince = 0;
 let pronounClosedHoldTime = 250;
 
 let selectedPronoun = "";
+let currentResultVideoId = "";
 
 let pronounScales = [1, 1, 1];
 let pronounHoverScale = 1.12;
@@ -84,6 +84,21 @@ const VIDEO_FILES = {
     volume: 0
   },
 
+  theyResult: {
+    src: "assets/videos/they.mp4",
+    volume: 1
+  },
+
+  sheResult: {
+    src: "assets/videos/she.mp4",
+    volume: 1
+  },
+
+  heResult: {
+    src: "assets/videos/he.mp4",
+    volume: 1
+  },
+
   back02: {
     src: "assets/videos/back_02.mp4",
     volume: 1
@@ -99,17 +114,20 @@ const PRONOUN_TEXTS = [
   {
     label: "They",
     x: 1040,
-    y: 150
+    y: 150,
+    resultVideo: "theyResult"
   },
   {
     label: "He",
     x: 615,
-    y: 489
+    y: 489,
+    resultVideo: "heResult"
   },
   {
     label: "She",
     x: 1375,
-    y: 460
+    y: 460,
+    resultVideo: "sheResult"
   }
 ];
 
@@ -307,19 +325,22 @@ function updatePronounInteraction() {
   if (state === "open") {
     pronounReadyToSelect = true;
     pronounClosedSince = 0;
-
-    if (hoveredPronounIndex !== -1) {
-      pronounCandidateIndex = hoveredPronounIndex;
-    }
+    pronounCandidateIndex = -1;
   }
 
   if (
     state === "closed" &&
     pronounReadyToSelect &&
-    pronounCandidateIndex !== -1
+    hoveredPronounIndex !== -1
   ) {
     if (pronounClosedSince === 0) {
       pronounClosedSince = now;
+      pronounCandidateIndex = hoveredPronounIndex;
+    }
+
+    if (pronounCandidateIndex !== hoveredPronounIndex) {
+      pronounClosedSince = now;
+      pronounCandidateIndex = hoveredPronounIndex;
     }
 
     if (now - pronounClosedSince > pronounClosedHoldTime) {
@@ -421,17 +442,46 @@ function getTrackedTextWidth(txt, size, tracking) {
 }
 
 function selectPronoun(index) {
+  if (index < 0) return;
+
   selectedPronoun = PRONOUN_TEXTS[index].label;
-
-  stopAllVideos();
-
-  currentScene = "pronounSelected";
+  currentResultVideoId = PRONOUN_TEXTS[index].resultVideo;
 
   hoveredPronounIndex = -1;
   pronounCandidateIndex = -1;
   pronounReadyToSelect = false;
   pronounClosedSince = 0;
   handCursorVisible = false;
+
+  startPronounResultCrossfade(currentResultVideoId);
+}
+
+function startPronounResultCrossfade(resultVideoId) {
+  isCrossfading = true;
+  crossfadeStartTime = millis();
+
+  activeTransition = {
+    type: "scene02LoopToResult",
+    resultVideoId: resultVideoId,
+    nextScene: "pronounResult"
+  };
+
+  currentScene = "pronounResult";
+
+  let video = videos[resultVideoId];
+
+  video.el.loop = false;
+  video.el.removeAttribute("muted");
+  video.el.muted = false;
+  video.el.volume = 0;
+
+  try {
+    video.el.currentTime = 0;
+  } catch (e) {}
+
+  video.el.play().catch(function (err) {
+    console.log("Play result failed:", resultVideoId, err);
+  });
 }
 
 function getHandOpenCloseState(hand) {
@@ -501,6 +551,7 @@ function getHandPoint(hand, index) {
 function playIntroLoop() {
   currentScene = "intro";
   isCrossfading = false;
+  activeTransition = null;
 
   stopAllVideos();
 
@@ -522,6 +573,7 @@ function playIntroLoop() {
 function playIntroTo01() {
   currentScene = "introTo01";
   isCrossfading = false;
+  activeTransition = null;
 
   stopAllVideos();
 
@@ -555,7 +607,8 @@ function checkAutoTransition() {
       "introTo01",
       "scene01Hand",
       ["scene01Hand"],
-      false
+      false,
+      "videoToVideo"
     );
   }
 
@@ -564,7 +617,8 @@ function checkAutoTransition() {
       "scene01Hand",
       "scene02Full",
       ["scene02Full"],
-      false
+      false,
+      "videoToVideo"
     );
   }
 
@@ -573,12 +627,19 @@ function checkAutoTransition() {
       "scene02Full",
       "scene02Loop",
       ["scene02BackLoop", "scene02BlobLoop"],
-      true
+      true,
+      "videoToScene02Loop"
     );
   }
 }
 
-function checkVideoEndForCrossfade(fromVideoId, nextSceneName, toVideoIds, loopTargets) {
+function checkVideoEndForCrossfade(
+  fromVideoId,
+  nextScene,
+  toVideoIds,
+  loopTargets,
+  transitionType
+) {
   let video = videos[fromVideoId].el;
 
   if (!video.duration) return;
@@ -586,18 +647,34 @@ function checkVideoEndForCrossfade(fromVideoId, nextSceneName, toVideoIds, loopT
   let timeLeft = video.duration - video.currentTime;
 
   if (timeLeft <= crossfadeDuration + crossfadeLead) {
-    startCrossfade(fromVideoId, nextSceneName, toVideoIds, loopTargets);
+    startAutoCrossfade(
+      fromVideoId,
+      nextScene,
+      toVideoIds,
+      loopTargets,
+      transitionType
+    );
   }
 }
 
-function startCrossfade(fromVideoId, nextSceneName, toVideoIds, loopTargets) {
+function startAutoCrossfade(
+  fromVideoId,
+  nextScene,
+  toVideoIds,
+  loopTargets,
+  transitionType
+) {
   isCrossfading = true;
   crossfadeStartTime = millis();
 
-  crossfadeFrom = fromVideoId;
-  crossfadeTo = toVideoIds;
+  activeTransition = {
+    type: transitionType,
+    fromVideoId: fromVideoId,
+    toVideoIds: toVideoIds,
+    nextScene: nextScene
+  };
 
-  currentScene = nextSceneName;
+  currentScene = nextScene;
 
   for (let i = 0; i < toVideoIds.length; i++) {
     let id = toVideoIds[i];
@@ -619,30 +696,46 @@ function startCrossfade(fromVideoId, nextSceneName, toVideoIds, loopTargets) {
 }
 
 function finishCrossfade() {
-  if (crossfadeFrom && videos[crossfadeFrom]) {
-    videos[crossfadeFrom].el.pause();
-    videos[crossfadeFrom].el.volume = videos[crossfadeFrom].volume;
-  }
+  if (!activeTransition) return;
 
-  for (let i = 0; i < crossfadeTo.length; i++) {
-    let id = crossfadeTo[i];
+  if (activeTransition.type === "scene02LoopToResult") {
+    videos.scene02BackLoop.el.pause();
+    videos.scene02BlobLoop.el.pause();
 
-    if (videos[id]) {
-      videos[id].el.volume = videos[id].volume;
+    videos.scene02BackLoop.el.volume = videos.scene02BackLoop.volume;
+    videos.scene02BlobLoop.el.volume = videos.scene02BlobLoop.volume;
+
+    if (currentResultVideoId && videos[currentResultVideoId]) {
+      videos[currentResultVideoId].el.volume = videos[currentResultVideoId].volume;
     }
+
+    currentScene = activeTransition.nextScene;
   }
 
   if (
-    crossfadeTo.length === 2 &&
-    crossfadeTo[0] === "scene02BackLoop" &&
-    crossfadeTo[1] === "scene02BlobLoop"
+    activeTransition.type === "videoToVideo" ||
+    activeTransition.type === "videoToScene02Loop"
   ) {
-    currentScene = "scene02Loop";
+    let fromVideoId = activeTransition.fromVideoId;
+
+    if (fromVideoId && videos[fromVideoId]) {
+      videos[fromVideoId].el.pause();
+      videos[fromVideoId].el.volume = videos[fromVideoId].volume;
+    }
+
+    for (let i = 0; i < activeTransition.toVideoIds.length; i++) {
+      let id = activeTransition.toVideoIds[i];
+
+      if (videos[id]) {
+        videos[id].el.volume = videos[id].volume;
+      }
+    }
+
+    currentScene = activeTransition.nextScene;
   }
 
   isCrossfading = false;
-  crossfadeFrom = null;
-  crossfadeTo = [];
+  activeTransition = null;
 }
 
 function stopAllVideos() {
@@ -686,36 +779,27 @@ function drawCurrentScene() {
     drawHandCursor();
   }
 
-  if (currentScene === "pronounSelected") {
-    drawSelectedPronounScreen();
+  if (currentScene === "pronounResult") {
+    drawVideo(currentResultVideoId);
   }
 }
 
 function drawCrossfade() {
+  if (!activeTransition) return;
+
   let p = (millis() - crossfadeStartTime) / (crossfadeDuration * 1000);
   p = constrain(p, 0, 1);
 
-  if (crossfadeFrom && videos[crossfadeFrom]) {
-    videos[crossfadeFrom].el.volume = videos[crossfadeFrom].volume * (1 - p);
-    drawVideo(crossfadeFrom, 1 - p);
+  if (activeTransition.type === "videoToVideo") {
+    drawVideoToVideoCrossfade(p);
   }
 
-  if (isCrossfadingToScene02Loop()) {
-    videos.scene02BackLoop.el.volume = videos.scene02BackLoop.volume * p;
-    videos.scene02BlobLoop.el.volume = videos.scene02BlobLoop.volume * p;
+  if (activeTransition.type === "videoToScene02Loop") {
+    drawVideoToScene02LoopCrossfade(p);
+  }
 
-    drawVideo("scene02BackLoop", p);
-    drawPronounTexts(p);
-    drawVideo("scene02BlobLoop", p);
-  } else {
-    for (let i = 0; i < crossfadeTo.length; i++) {
-      let id = crossfadeTo[i];
-
-      if (videos[id]) {
-        videos[id].el.volume = videos[id].volume * p;
-        drawVideo(id, p);
-      }
-    }
+  if (activeTransition.type === "scene02LoopToResult") {
+    drawScene02LoopToResultCrossfade(p);
   }
 
   if (p >= 1) {
@@ -723,12 +807,43 @@ function drawCrossfade() {
   }
 }
 
-function isCrossfadingToScene02Loop() {
-  return (
-    crossfadeTo.length === 2 &&
-    crossfadeTo[0] === "scene02BackLoop" &&
-    crossfadeTo[1] === "scene02BlobLoop"
-  );
+function drawVideoToVideoCrossfade(p) {
+  let fromVideoId = activeTransition.fromVideoId;
+  let toVideoId = activeTransition.toVideoIds[0];
+
+  videos[fromVideoId].el.volume = videos[fromVideoId].volume * (1 - p);
+  videos[toVideoId].el.volume = videos[toVideoId].volume * p;
+
+  drawVideo(fromVideoId, 1 - p);
+  drawVideo(toVideoId, p);
+}
+
+function drawVideoToScene02LoopCrossfade(p) {
+  let fromVideoId = activeTransition.fromVideoId;
+
+  videos[fromVideoId].el.volume = videos[fromVideoId].volume * (1 - p);
+  videos.scene02BackLoop.el.volume = videos.scene02BackLoop.volume * p;
+  videos.scene02BlobLoop.el.volume = videos.scene02BlobLoop.volume * p;
+
+  drawVideo(fromVideoId, 1 - p);
+
+  drawVideo("scene02BackLoop", p);
+  drawPronounTexts(p);
+  drawVideo("scene02BlobLoop", p);
+}
+
+function drawScene02LoopToResultCrossfade(p) {
+  let resultVideoId = activeTransition.resultVideoId;
+
+  videos.scene02BackLoop.el.volume = videos.scene02BackLoop.volume * (1 - p);
+  videos.scene02BlobLoop.el.volume = videos.scene02BlobLoop.volume * (1 - p);
+  videos[resultVideoId].el.volume = videos[resultVideoId].volume * p;
+
+  drawVideo("scene02BackLoop", 1 - p);
+  drawPronounTexts(1 - p);
+  drawVideo("scene02BlobLoop", 1 - p);
+
+  drawVideo(resultVideoId, p);
 }
 
 function drawVideo(id, alpha = 1) {
@@ -811,22 +926,6 @@ function drawHandCursor() {
   stroke(255);
   strokeWeight(2);
   ellipse(handCursorX, handCursorY, 28, 28);
-
-  pop();
-}
-
-function drawSelectedPronounScreen() {
-  background(245);
-
-  push();
-
-  textFont(pronounFont);
-  textAlign(CENTER, CENTER);
-  textSize(260);
-  fill(255, 180);
-  noStroke();
-
-  text(selectedPronoun, W / 2, H / 2);
 
   pop();
 }
