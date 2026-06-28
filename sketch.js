@@ -4,29 +4,32 @@ let H = 1080;
 let cnv;
 let videos = {};
 
-let started = false;
-let currentScene = "start";
+let currentScene = "intro";
 
-let videoFiles = {
-  back02: {
-    src: "assets/videos/back_02.mp4",
-    volume: 1
-  },
-  blob: {
-    src: "assets/videos/blob_v2.webm",
-    volume: 0
-  },
+const VIDEO_FILES = {
   intro: {
     src: "assets/videos/intro.mp4",
     volume: 1
   },
+
   introTo01: {
     src: "assets/videos/intro_to_01.mp4",
     volume: 1
   },
+
   scene01Hand: {
     src: "assets/videos/secne01_hand.mp4",
     volume: 1
+  },
+
+  back02: {
+    src: "assets/videos/back_02.mp4",
+    volume: 1
+  },
+
+  blob: {
+    src: "assets/videos/blob_v2.webm",
+    volume: 0
   }
 };
 
@@ -35,11 +38,11 @@ function setup() {
   pixelDensity(1);
   fitCanvasToWindow();
 
-  for (let id in videoFiles) {
-    videos[id] = makeVideo(id, videoFiles[id].src, videoFiles[id].volume);
-  }
+  loadVideos();
 
   window.addEventListener("keydown", handleKey);
+
+  playIntroLoop();
 }
 
 function draw() {
@@ -48,236 +51,148 @@ function draw() {
   drawingContext.imageSmoothingEnabled = true;
   drawingContext.imageSmoothingQuality = "high";
 
-  if (!started) {
-    drawStartScreen();
-    return;
-  }
-
-  drawScene();
-  drawDebug();
+  drawCurrentScene();
 }
 
-function makeVideo(id, src, volumeLevel) {
-  let v = {
+function loadVideos() {
+  for (let id in VIDEO_FILES) {
+    videos[id] = createVideoElement(
+      id,
+      VIDEO_FILES[id].src,
+      VIDEO_FILES[id].volume
+    );
+  }
+}
+
+function createVideoElement(id, src, volumeLevel) {
+  let video = {
     id: id,
     src: src,
     volume: volumeLevel,
-    el: document.createElement("video"),
-    ready: false,
-    error: false,
-    status: "loading"
+    el: document.createElement("video")
   };
 
-  v.el.src = src;
-  v.el.loop = false;
-  v.el.muted = false;
-  v.el.volume = volumeLevel;
-  v.el.playsInline = true;
-  v.el.preload = "auto";
+  video.el.src = src;
+  video.el.loop = false;
+  video.el.muted = true;
+  video.el.volume = volumeLevel;
+  video.el.playsInline = true;
+  video.el.preload = "auto";
 
-  v.el.setAttribute("playsinline", "");
-  v.el.setAttribute("webkit-playsinline", "");
+  video.el.setAttribute("muted", "");
+  video.el.setAttribute("playsinline", "");
+  video.el.setAttribute("webkit-playsinline", "");
 
-  v.el.addEventListener("loadeddata", function () {
-    v.ready = true;
-    v.status = "loaded";
+  video.el.addEventListener("ended", function () {
+    onVideoEnded(id);
   });
 
-  v.el.addEventListener("canplay", function () {
-    v.ready = true;
-    v.status = "canplay";
-  });
+  video.el.load();
 
-  v.el.addEventListener("playing", function () {
-    v.status = "playing";
-  });
-
-  v.el.addEventListener("ended", function () {
-    v.status = "ended";
-  });
-
-  v.el.addEventListener("error", function () {
-    v.error = true;
-    v.status = "ERROR";
-    console.log("VIDEO ERROR:", id, src, v.el.error);
-  });
-
-  v.el.load();
-
-  return v;
+  return video;
 }
 
-function drawStartScreen() {
-  background(245);
+function playIntroLoop() {
+  currentScene = "intro";
+  stopAllVideos();
 
-  drawText("MIGO TEST", W / 2, H / 2 - 50, 72);
-  drawText("Click once to start", W / 2, H / 2 + 40, 38);
-}
+  let intro = videos.intro;
 
-function mousePressed() {
-  if (!started) {
-    started = true;
-    playScene("intro");
-  }
+  intro.el.loop = true;
+  intro.el.muted = true;
+  intro.el.volume = 0;
+
+  try {
+    intro.el.currentTime = 0;
+  } catch (e) {}
+
+  intro.el.play().catch(function (err) {
+    console.log("Intro autoplay failed:", err);
+  });
 }
 
 function handleKey(e) {
-  if (!started) return;
-
-  if (e.key === "1") playScene("intro");
-  if (e.key === "2") playScene("introTo01");
-  if (e.key === "3") playScene("backBlob");
-  if (e.key === "4") playScene("scene01Hand");
-  if (e.key === "5") playScene("blobOnly");
-  if (e.key === "6") playScene("backOnly");
+  if (e.key === "Enter") {
+    playIntroTo01();
+  }
 }
 
-function playScene(sceneName) {
-  currentScene = sceneName;
+function playIntroTo01() {
+  currentScene = "introTo01";
   stopAllVideos();
 
-  if (sceneName === "intro") {
-    playVideo("intro", false);
-  }
+  let video = videos.introTo01;
 
-  if (sceneName === "introTo01") {
-    playVideo("introTo01", false);
-  }
-
-  if (sceneName === "backBlob") {
-    playVideo("back02", true);
-    playVideo("blob", true);
-  }
-
-  if (sceneName === "scene01Hand") {
-    playVideo("scene01Hand", false);
-  }
-
-  if (sceneName === "blobOnly") {
-    playVideo("blob", true);
-  }
-
-  if (sceneName === "backOnly") {
-    playVideo("back02", true);
-  }
-}
-
-function playVideo(id, loopIt) {
-  let v = videos[id];
-
-  v.el.loop = loopIt;
-  v.el.muted = false;
-  v.el.volume = v.volume;
+  video.el.loop = false;
+  video.el.muted = false;
+  video.el.volume = video.volume;
 
   try {
-    v.el.currentTime = 0;
+    video.el.currentTime = 0;
   } catch (e) {}
 
-  v.el.play()
-    .then(function () {
-      v.status = "playing";
-    })
-    .catch(function (err) {
-      v.status = "play failed";
-      console.log("PLAY FAILED:", id, err);
-    });
+  video.el.play().catch(function (err) {
+    console.log("Play intro_to_01 failed:", err);
+  });
+}
+
+function playScene01Hand() {
+  currentScene = "scene01Hand";
+  stopAllVideos();
+
+  let video = videos.scene01Hand;
+
+  video.el.loop = false;
+  video.el.muted = false;
+  video.el.volume = video.volume;
+
+  try {
+    video.el.currentTime = 0;
+  } catch (e) {}
+
+  video.el.play().catch(function (err) {
+    console.log("Play scene01_hand failed:", err);
+  });
+}
+
+function onVideoEnded(videoId) {
+  if (currentScene === "introTo01" && videoId === "introTo01") {
+    playScene01Hand();
+  }
 }
 
 function stopAllVideos() {
   for (let id in videos) {
-    let v = videos[id];
-
-    v.el.pause();
+    videos[id].el.pause();
 
     try {
-      v.el.currentTime = 0;
+      videos[id].el.currentTime = 0;
     } catch (e) {}
-
-    v.status = v.ready ? "stopped" : v.status;
   }
 }
 
-function drawScene() {
-  background(245);
-
+function drawCurrentScene() {
   if (currentScene === "intro") {
-    drawVideo("intro", 0, 0, W, H);
+    drawVideo("intro");
   }
 
   if (currentScene === "introTo01") {
-    drawVideo("introTo01", 0, 0, W, H);
-  }
-
-  if (currentScene === "backBlob") {
-    drawVideo("back02", 0, 0, W, H);
-    drawVideo("blob", 0, 0, W, H);
+    drawVideo("introTo01");
   }
 
   if (currentScene === "scene01Hand") {
-    drawVideo("scene01Hand", 0, 0, W, H);
-  }
-
-  if (currentScene === "blobOnly") {
-    background(30);
-    drawVideo("blob", 0, 0, W, H);
-  }
-
-  if (currentScene === "backOnly") {
-    drawVideo("back02", 0, 0, W, H);
+    drawVideo("scene01Hand");
   }
 }
 
-function drawVideo(id, x, y, w, h) {
-  let v = videos[id];
+function drawVideo(id) {
+  let video = videos[id];
 
-  if (!v || v.error) return;
+  if (!video) return;
 
-  if (v.el.readyState > 0) {
-    drawingContext.drawImage(v.el, x, y, w, h);
+  if (video.el.readyState > 0) {
+    drawingContext.drawImage(video.el, 0, 0, W, H);
   }
-}
-
-function drawDebug() {
-  push();
-
-  noStroke();
-  fill(255, 255, 255, 215);
-  rect(24, 24, 590, 245, 18);
-
-  fill(40);
-  textAlign(LEFT, TOP);
-  textSize(24);
-  text("scene: " + currentScene, 50, 45);
-  text("1 intro | 2 transition | 3 back+blob | 4 hand | 5 blob | 6 back", 50, 80);
-
-  let y = 120;
-
-  for (let id in videos) {
-    let v = videos[id];
-
-    if (v.error || v.status === "play failed") {
-      fill(220, 40, 40);
-    } else if (v.el.readyState > 0 || v.ready) {
-      fill(40, 150, 70);
-    } else {
-      fill(120);
-    }
-
-    text(id + " — " + v.status + " / rs:" + v.el.readyState, 50, y);
-    y += 28;
-  }
-
-  pop();
-}
-
-function drawText(txt, x, y, size) {
-  push();
-  textAlign(CENTER, CENTER);
-  textSize(size);
-  fill(60);
-  noStroke();
-  text(txt, x, y);
-  pop();
 }
 
 function fitCanvasToWindow() {
