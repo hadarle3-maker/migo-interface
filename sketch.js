@@ -86,17 +86,17 @@ const VIDEO_FILES = {
 const PRONOUN_TEXTS = [
   {
     label: "They",
-    x: 960,
-    y: 145
+    x: 965,
+    y: 140
   },
   {
     label: "He",
-    x: 650,
+    x: 645,
     y: 430
   },
   {
     label: "She",
-    x: 1320,
+    x: 1325,
     y: 350
   }
 ];
