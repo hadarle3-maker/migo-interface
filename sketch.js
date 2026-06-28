@@ -92,7 +92,7 @@ const PRONOUN_TEXTS = [
   {
     label: "He",
     x: 610,
-    y: 510
+    y: 530
   },
   {
     label: "She",
