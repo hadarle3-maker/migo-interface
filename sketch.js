@@ -6,6 +6,10 @@ let videos = {};
 
 let currentScene = "intro";
 
+let isCrossfading = false;
+let crossfadeStartTime = 0;
+let crossfadeDuration = 0.4;
+
 const VIDEO_FILES = {
   intro: {
     src: "assets/videos/intro.mp4",
@@ -51,6 +55,7 @@ function draw() {
   drawingContext.imageSmoothingEnabled = true;
   drawingContext.imageSmoothingQuality = "high";
 
+  checkAutoTransition();
   drawCurrentScene();
 }
 
@@ -83,10 +88,6 @@ function createVideoElement(id, src, volumeLevel) {
   video.el.setAttribute("playsinline", "");
   video.el.setAttribute("webkit-playsinline", "");
 
-  video.el.addEventListener("ended", function () {
-    onVideoEnded(id);
-  });
-
   video.el.load();
 
   return video;
@@ -94,6 +95,8 @@ function createVideoElement(id, src, volumeLevel) {
 
 function playIntroLoop() {
   currentScene = "intro";
+  isCrossfading = false;
+
   stopAllVideos();
 
   let intro = videos.intro;
@@ -112,13 +115,15 @@ function playIntroLoop() {
 }
 
 function handleKey(e) {
-  if (e.key === "Enter") {
+  if (e.key === "Enter" && currentScene === "intro") {
     playIntroTo01();
   }
 }
 
 function playIntroTo01() {
   currentScene = "introTo01";
+  isCrossfading = false;
+
   stopAllVideos();
 
   let video = videos.introTo01;
@@ -136,29 +141,48 @@ function playIntroTo01() {
   });
 }
 
-function playScene01Hand() {
-  currentScene = "scene01Hand";
-  stopAllVideos();
+function checkAutoTransition() {
+  if (currentScene !== "introTo01") return;
+  if (isCrossfading) return;
 
-  let video = videos.scene01Hand;
+  let video = videos.introTo01.el;
 
-  video.el.loop = false;
-  video.el.muted = false;
-  video.el.volume = video.volume;
+  if (!video.duration) return;
+
+  let timeLeft = video.duration - video.currentTime;
+
+  if (timeLeft <= crossfadeDuration) {
+    startCrossfadeToScene01Hand();
+  }
+}
+
+function startCrossfadeToScene01Hand() {
+  isCrossfading = true;
+  crossfadeStartTime = millis();
+
+  let nextVideo = videos.scene01Hand;
+
+  nextVideo.el.loop = false;
+  nextVideo.el.muted = false;
+  nextVideo.el.volume = 0;
 
   try {
-    video.el.currentTime = 0;
+    nextVideo.el.currentTime = 0;
   } catch (e) {}
 
-  video.el.play().catch(function (err) {
+  nextVideo.el.play().catch(function (err) {
     console.log("Play scene01_hand failed:", err);
   });
 }
 
-function onVideoEnded(videoId) {
-  if (currentScene === "introTo01" && videoId === "introTo01") {
-    playScene01Hand();
-  }
+function finishCrossfadeToScene01Hand() {
+  videos.introTo01.el.pause();
+
+  videos.scene01Hand.el.muted = false;
+  videos.scene01Hand.el.volume = videos.scene01Hand.volume;
+
+  currentScene = "scene01Hand";
+  isCrossfading = false;
 }
 
 function stopAllVideos() {
@@ -177,7 +201,11 @@ function drawCurrentScene() {
   }
 
   if (currentScene === "introTo01") {
-    drawVideo("introTo01");
+    if (isCrossfading) {
+      drawCrossfade("introTo01", "scene01Hand");
+    } else {
+      drawVideo("introTo01");
+    }
   }
 
   if (currentScene === "scene01Hand") {
@@ -185,13 +213,34 @@ function drawCurrentScene() {
   }
 }
 
-function drawVideo(id) {
+function drawCrossfade(fromId, toId) {
+  let p = (millis() - crossfadeStartTime) / (crossfadeDuration * 1000);
+  p = constrain(p, 0, 1);
+
+  let fromVideo = videos[fromId];
+  let toVideo = videos[toId];
+
+  fromVideo.el.volume = fromVideo.volume * (1 - p);
+  toVideo.el.volume = toVideo.volume * p;
+
+  drawVideo(fromId, 1 - p);
+  drawVideo(toId, p);
+
+  if (p >= 1) {
+    finishCrossfadeToScene01Hand();
+  }
+}
+
+function drawVideo(id, alpha = 1) {
   let video = videos[id];
 
   if (!video) return;
 
   if (video.el.readyState > 0) {
+    drawingContext.save();
+    drawingContext.globalAlpha = alpha;
     drawingContext.drawImage(video.el, 0, 0, W, H);
+    drawingContext.restore();
   }
 }
 
