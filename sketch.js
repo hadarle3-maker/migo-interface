@@ -807,9 +807,10 @@ function drawHandCursor() {
 
   push();
 
-  fill(0);
-  noStroke();
-  ellipse(handCursorX, handCursorY, 18, 18);
+  fill(255, 150);
+  stroke(255, 230);
+  strokeWeight(2);
+  ellipse(handCursorX, handCursorY, 28, 28);
 
   pop();
 }
