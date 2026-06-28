@@ -35,6 +35,24 @@ let pronounFont;
 let pronounTextSize = 200;
 let pronounTracking = -10;
 
+let handCursorX = 0;
+let handCursorY = 0;
+let handCursorVisible = false;
+let handCursorReady = false;
+let mirrorHandX = true;
+
+let hoveredPronounIndex = -1;
+let pronounCandidateIndex = -1;
+let pronounReadyToSelect = false;
+let pronounClosedSince = 0;
+let pronounClosedHoldTime = 250;
+
+let selectedPronoun = "";
+
+let pronounScales = [1, 1, 1];
+let pronounHoverScale = 1.12;
+let pronounScaleEase = 0.14;
+
 const VIDEO_FILES = {
   intro: {
     src: "assets/videos/intro.mp4",
@@ -186,6 +204,10 @@ function updateCameraInteraction() {
     detectFaceForSound();
     detectOpenCloseHandToContinue();
   }
+
+  if (currentScene === "scene02Loop" && !isCrossfading) {
+    updatePronounInteraction();
+  }
 }
 
 function detectFaceForSound() {
@@ -263,6 +285,153 @@ function detectOpenCloseHandToContinue() {
       closedSince = 0;
     }
   }
+}
+
+function updatePronounInteraction() {
+  updateHandCursor();
+
+  if (!handCursorVisible || hands.length === 0) {
+    hoveredPronounIndex = -1;
+    pronounCandidateIndex = -1;
+    pronounReadyToSelect = false;
+    pronounClosedSince = 0;
+    return;
+  }
+
+  hoveredPronounIndex = getHoveredPronounIndex(handCursorX, handCursorY);
+
+  let hand = hands[0];
+  let state = getHandOpenCloseState(hand);
+  let now = millis();
+
+  if (state === "open") {
+    pronounReadyToSelect = true;
+    pronounClosedSince = 0;
+
+    if (hoveredPronounIndex !== -1) {
+      pronounCandidateIndex = hoveredPronounIndex;
+    }
+  }
+
+  if (
+    state === "closed" &&
+    pronounReadyToSelect &&
+    pronounCandidateIndex !== -1
+  ) {
+    if (pronounClosedSince === 0) {
+      pronounClosedSince = now;
+    }
+
+    if (now - pronounClosedSince > pronounClosedHoldTime) {
+      selectPronoun(pronounCandidateIndex);
+    }
+  }
+
+  if (state !== "closed") {
+    pronounClosedSince = 0;
+  }
+}
+
+function updateHandCursor() {
+  if (hands.length === 0) {
+    handCursorVisible = false;
+    handCursorReady = false;
+    return;
+  }
+
+  let hand = hands[0];
+  let point = getHandPoint(hand, 8);
+
+  if (!point) {
+    handCursorVisible = false;
+    handCursorReady = false;
+    return;
+  }
+
+  let camW = webcam.width || 640;
+  let camH = webcam.height || 360;
+
+  let targetX;
+
+  if (mirrorHandX) {
+    targetX = map(point.x, 0, camW, W, 0);
+  } else {
+    targetX = map(point.x, 0, camW, 0, W);
+  }
+
+  let targetY = map(point.y, 0, camH, 0, H);
+
+  targetX = constrain(targetX, 0, W);
+  targetY = constrain(targetY, 0, H);
+
+  if (!handCursorReady) {
+    handCursorX = targetX;
+    handCursorY = targetY;
+    handCursorReady = true;
+  } else {
+    handCursorX = lerp(handCursorX, targetX, 0.22);
+    handCursorY = lerp(handCursorY, targetY, 0.22);
+  }
+
+  handCursorVisible = true;
+}
+
+function getHoveredPronounIndex(x, y) {
+  for (let i = 0; i < PRONOUN_TEXTS.length; i++) {
+    let item = PRONOUN_TEXTS[i];
+    let wordWidth = getTrackedTextWidth(
+      item.label,
+      pronounTextSize,
+      pronounTracking
+    );
+
+    let hitW = wordWidth + 120;
+    let hitH = pronounTextSize * 0.85;
+
+    let insideX = x > item.x - hitW / 2 && x < item.x + hitW / 2;
+    let insideY = y > item.y - hitH / 2 && y < item.y + hitH / 2;
+
+    if (insideX && insideY) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+function getTrackedTextWidth(txt, size, tracking) {
+  push();
+
+  textFont(pronounFont);
+  textSize(size);
+
+  let totalWidth = 0;
+
+  for (let i = 0; i < txt.length; i++) {
+    totalWidth += textWidth(txt[i]);
+
+    if (i < txt.length - 1) {
+      totalWidth += tracking;
+    }
+  }
+
+  pop();
+
+  return totalWidth;
+}
+
+function selectPronoun(index) {
+  selectedPronoun = PRONOUN_TEXTS[index].label;
+
+  stopAllVideos();
+
+  currentScene = "pronounSelected";
+
+  hoveredPronounIndex = -1;
+  pronounCandidateIndex = -1;
+  pronounReadyToSelect = false;
+  pronounClosedSince = 0;
+  handCursorVisible = false;
 }
 
 function getHandOpenCloseState(hand) {
@@ -514,6 +683,11 @@ function drawCurrentScene() {
     drawVideo("scene02BackLoop");
     drawPronounTexts();
     drawVideo("scene02BlobLoop");
+    drawHandCursor();
+  }
+
+  if (currentScene === "pronounSelected") {
+    drawSelectedPronounScreen();
   }
 }
 
@@ -575,20 +749,32 @@ function drawPronounTexts(alpha = 1) {
 
   textFont(pronounFont);
   textSize(pronounTextSize);
-  fill(255, 255 * alpha);
   noStroke();
 
   for (let i = 0; i < PRONOUN_TEXTS.length; i++) {
     let item = PRONOUN_TEXTS[i];
 
-    drawTrackedText(item.label, item.x, item.y, pronounTracking, alpha);
+    let targetScale = i === hoveredPronounIndex ? pronounHoverScale : 1;
+    pronounScales[i] = lerp(pronounScales[i], targetScale, pronounScaleEase);
+
+    drawTrackedText(
+      item.label,
+      item.x,
+      item.y,
+      pronounTracking,
+      alpha,
+      pronounScales[i]
+    );
   }
 
   pop();
 }
 
-function drawTrackedText(txt, x, y, tracking, alpha = 1) {
+function drawTrackedText(txt, x, y, tracking, alpha = 1, scaleAmount = 1) {
   push();
+
+  translate(x, y);
+  scale(scaleAmount);
 
   textFont(pronounFont);
   textSize(pronounTextSize);
@@ -606,12 +792,40 @@ function drawTrackedText(txt, x, y, tracking, alpha = 1) {
     }
   }
 
-  let cursorX = x - totalWidth / 2;
+  let cursorX = -totalWidth / 2;
 
   for (let i = 0; i < txt.length; i++) {
-    text(txt[i], cursorX, y);
+    text(txt[i], cursorX, 0);
     cursorX += textWidth(txt[i]) + tracking;
   }
+
+  pop();
+}
+
+function drawHandCursor() {
+  if (!handCursorVisible) return;
+
+  push();
+
+  fill(0);
+  noStroke();
+  ellipse(handCursorX, handCursorY, 18, 18);
+
+  pop();
+}
+
+function drawSelectedPronounScreen() {
+  background(245);
+
+  push();
+
+  textFont(pronounFont);
+  textAlign(CENTER, CENTER);
+  textSize(260);
+  fill(70);
+  noStroke();
+
+  text(selectedPronoun, W / 2, H / 2);
 
   pop();
 }
