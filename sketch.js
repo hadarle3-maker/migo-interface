@@ -823,7 +823,7 @@ function drawSelectedPronounScreen() {
   textFont(pronounFont);
   textAlign(CENTER, CENTER);
   textSize(260);
-  fill(70);
+  fill(255, 180);
   noStroke();
 
   text(selectedPronoun, W / 2, H / 2);
