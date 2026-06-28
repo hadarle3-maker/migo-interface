@@ -8,7 +8,8 @@ let currentScene = "intro";
 
 let isCrossfading = false;
 let crossfadeStartTime = 0;
-let crossfadeDuration = 0.4;
+let crossfadeDuration = 0.9;
+let crossfadeLead = 0.18;
 
 const VIDEO_FILES = {
   intro: {
@@ -129,6 +130,7 @@ function playIntroTo01() {
   let video = videos.introTo01;
 
   video.el.loop = false;
+  video.el.removeAttribute("muted");
   video.el.muted = false;
   video.el.volume = video.volume;
 
@@ -151,7 +153,7 @@ function checkAutoTransition() {
 
   let timeLeft = video.duration - video.currentTime;
 
-  if (timeLeft <= crossfadeDuration) {
+  if (timeLeft <= crossfadeDuration + crossfadeLead) {
     startCrossfadeToScene01Hand();
   }
 }
@@ -163,6 +165,7 @@ function startCrossfadeToScene01Hand() {
   let nextVideo = videos.scene01Hand;
 
   nextVideo.el.loop = false;
+  nextVideo.el.removeAttribute("muted");
   nextVideo.el.muted = false;
   nextVideo.el.volume = 0;
 
@@ -177,7 +180,9 @@ function startCrossfadeToScene01Hand() {
 
 function finishCrossfadeToScene01Hand() {
   videos.introTo01.el.pause();
+  videos.introTo01.el.volume = videos.introTo01.volume;
 
+  videos.scene01Hand.el.removeAttribute("muted");
   videos.scene01Hand.el.muted = false;
   videos.scene01Hand.el.volume = videos.scene01Hand.volume;
 
