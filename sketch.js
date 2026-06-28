@@ -11,6 +11,19 @@ let crossfadeStartTime = 0;
 let crossfadeDuration = 0.9;
 let crossfadeLead = 0.18;
 
+let handPose;
+let faceMesh;
+let webcam;
+let hands = [];
+let faces = [];
+
+let sawOpenHand = false;
+let handWasClosed = false;
+let lastHandGestureTime = 0;
+let gestureCooldown = 1400;
+
+let introSoundUnlocked = false;
+
 const VIDEO_FILES = {
   intro: {
     src: "assets/videos/intro.mp4",
@@ -38,14 +51,18 @@ const VIDEO_FILES = {
   }
 };
 
+function preload() {
+  handPose = ml5.handPose({ maxHands: 1 });
+  faceMesh = ml5.faceMesh({ maxFaces: 1, refineLandmarks: false });
+}
+
 function setup() {
   cnv = createCanvas(W, H);
   pixelDensity(1);
   fitCanvasToWindow();
 
   loadVideos();
-
-  window.addEventListener("keydown", handleKey);
+  setupCamera();
 
   playIntroLoop();
 }
@@ -56,6 +73,7 @@ function draw() {
   drawingContext.imageSmoothingEnabled = true;
   drawingContext.imageSmoothingQuality = "high";
 
+  updateCameraInteraction();
   checkAutoTransition();
   drawCurrentScene();
 }
@@ -94,6 +112,148 @@ function createVideoElement(id, src, volumeLevel) {
   return video;
 }
 
+function setupCamera() {
+  webcam = createCapture({
+    video: {
+      width: 640,
+      height: 360
+    },
+    audio: false
+  });
+
+  webcam.hide();
+
+  handPose.detectStart(webcam, gotHands);
+  faceMesh.detectStart(webcam, gotFaces);
+}
+
+function gotHands(results) {
+  hands = results;
+}
+
+function gotFaces(results) {
+  faces = results;
+}
+
+function updateCameraInteraction() {
+  if (currentScene === "intro") {
+    detectFaceForSound();
+    detectOpenCloseHandToContinue();
+  }
+}
+
+function detectFaceForSound() {
+  if (introSoundUnlocked) return;
+
+  if (faces.length > 0) {
+    unlockIntroSound();
+  }
+}
+
+function unlockIntroSound() {
+  let intro = videos.intro.el;
+
+  intro.muted = false;
+  intro.volume = videos.intro.volume;
+
+  intro.play()
+    .then(function () {
+      introSoundUnlocked = true;
+    })
+    .catch(function (err) {
+      console.log("Intro sound unlock blocked:", err);
+    });
+}
+
+function detectOpenCloseHandToContinue() {
+  if (hands.length === 0) return;
+
+  let hand = hands[0];
+  let state = getHandOpenCloseState(hand);
+
+  if (state === "open") {
+    sawOpenHand = true;
+    handWasClosed = false;
+  }
+
+  if (
+    state === "closed" &&
+    sawOpenHand &&
+    !handWasClosed &&
+    millis() - lastHandGestureTime > gestureCooldown
+  ) {
+    handWasClosed = true;
+    sawOpenHand = false;
+    lastHandGestureTime = millis();
+
+    playIntroTo01();
+  }
+}
+
+function getHandOpenCloseState(hand) {
+  let wrist = getHandPoint(hand, 0);
+
+  let indexTip = getHandPoint(hand, 8);
+  let indexPip = getHandPoint(hand, 6);
+
+  let middleTip = getHandPoint(hand, 12);
+  let middlePip = getHandPoint(hand, 10);
+
+  let ringTip = getHandPoint(hand, 16);
+  let ringPip = getHandPoint(hand, 14);
+
+  let pinkyTip = getHandPoint(hand, 20);
+  let pinkyPip = getHandPoint(hand, 18);
+
+  if (
+    !wrist ||
+    !indexTip ||
+    !indexPip ||
+    !middleTip ||
+    !middlePip ||
+    !ringTip ||
+    !ringPip ||
+    !pinkyTip ||
+    !pinkyPip
+  ) {
+    return "unknown";
+  }
+
+  let extendedCount = 0;
+
+  if (isFingerExtended(wrist, indexTip, indexPip)) extendedCount++;
+  if (isFingerExtended(wrist, middleTip, middlePip)) extendedCount++;
+  if (isFingerExtended(wrist, ringTip, ringPip)) extendedCount++;
+  if (isFingerExtended(wrist, pinkyTip, pinkyPip)) extendedCount++;
+
+  if (extendedCount >= 3) return "open";
+  if (extendedCount <= 1) return "closed";
+
+  return "middle";
+}
+
+function isFingerExtended(wrist, tip, pip) {
+  let tipDist = dist(wrist.x, wrist.y, tip.x, tip.y);
+  let pipDist = dist(wrist.x, wrist.y, pip.x, pip.y);
+
+  return tipDist > pipDist * 1.08;
+}
+
+function getHandPoint(hand, index) {
+  if (hand.keypoints && hand.keypoints[index]) {
+    return hand.keypoints[index];
+  }
+
+  if (hand.landmarks && hand.landmarks[index]) {
+    return {
+      x: hand.landmarks[index][0],
+      y: hand.landmarks[index][1]
+    };
+  }
+
+  return null;
+}
+
 function playIntroLoop() {
   currentScene = "intro";
   isCrossfading = false;
@@ -113,12 +273,6 @@ function playIntroLoop() {
   intro.el.play().catch(function (err) {
     console.log("Intro autoplay failed:", err);
   });
-}
-
-function handleKey(e) {
-  if (e.key === "Enter" && currentScene === "intro") {
-    playIntroTo01();
-  }
 }
 
 function playIntroTo01() {
