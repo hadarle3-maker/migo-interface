@@ -8,7 +8,7 @@ let mode = "combo";
 
 let videoFiles = {
   back02: "assets/videos/back_02.mp4",
-  blob: "assets/videos/blob.webm",
+  blob: "assets/videos/blob_v2.webm",
   intro: "assets/videos/intro.mp4",
   introTo01: "assets/videos/intro_to_01.mp4",
   scene01Hand: "assets/videos/secne01_hand.mp4"
