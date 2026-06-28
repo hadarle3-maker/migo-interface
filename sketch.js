@@ -20,12 +20,26 @@ let webcam;
 let hands = [];
 let faces = [];
 
-let sawOpenHand = false;
-let handWasClosed = false;
+let gesturePhase = "waitingOpen";
+let openSince = 0;
+let closedSince = 0;
+let openHoldTime = 350;
+let closedHoldTime = 250;
 let lastHandGestureTime = 0;
 let gestureCooldown = 1400;
 
 let introSoundUnlocked = false;
+
+let pronounFont;
+let scene02ReferenceImage;
+
+let showScene02Reference = true;
+let scene02ReferenceAlpha = 0.45;
+
+let showPronounAnchors = true;
+
+let pronounTextSize = 200;
+let pronounTracking = -10;
 
 const VIDEO_FILES = {
   intro: {
@@ -69,9 +83,30 @@ const VIDEO_FILES = {
   }
 };
 
+const PRONOUN_TEXTS = [
+  {
+    label: "They",
+    x: 960,
+    y: 145
+  },
+  {
+    label: "He",
+    x: 650,
+    y: 430
+  },
+  {
+    label: "She",
+    x: 1320,
+    y: 350
+  }
+];
+
 function preload() {
   handPose = ml5.handPose({ maxHands: 1 });
   faceMesh = ml5.faceMesh({ maxFaces: 1, refineLandmarks: false });
+
+  pronounFont = loadFont("assets/fonts/TheBasics_Corporate-LightItalic.ttf");
+  scene02ReferenceImage = loadImage("assets/videos/secen02.png");
 }
 
 function setup() {
@@ -184,27 +219,56 @@ function unlockIntroSound() {
 }
 
 function detectOpenCloseHandToContinue() {
-  if (hands.length === 0) return;
+  if (currentScene !== "intro") return;
+  if (isCrossfading) return;
+
+  if (hands.length === 0) {
+    gesturePhase = "waitingOpen";
+    openSince = 0;
+    closedSince = 0;
+    return;
+  }
 
   let hand = hands[0];
   let state = getHandOpenCloseState(hand);
+  let now = millis();
 
-  if (state === "open") {
-    sawOpenHand = true;
-    handWasClosed = false;
+  if (gesturePhase === "waitingOpen") {
+    if (state === "open") {
+      if (openSince === 0) {
+        openSince = now;
+      }
+
+      if (now - openSince > openHoldTime) {
+        gesturePhase = "waitingClosed";
+        closedSince = 0;
+      }
+    } else {
+      openSince = 0;
+    }
   }
 
-  if (
-    state === "closed" &&
-    sawOpenHand &&
-    !handWasClosed &&
-    millis() - lastHandGestureTime > gestureCooldown
-  ) {
-    handWasClosed = true;
-    sawOpenHand = false;
-    lastHandGestureTime = millis();
+  if (gesturePhase === "waitingClosed") {
+    if (state === "closed") {
+      if (closedSince === 0) {
+        closedSince = now;
+      }
 
-    playIntroTo01();
+      if (
+        now - closedSince > closedHoldTime &&
+        now - lastHandGestureTime > gestureCooldown
+      ) {
+        lastHandGestureTime = now;
+
+        gesturePhase = "waitingOpen";
+        openSince = 0;
+        closedSince = 0;
+
+        playIntroTo01();
+      }
+    } else {
+      closedSince = 0;
+    }
   }
 }
 
@@ -300,16 +364,6 @@ function playIntroTo01() {
   stopAllVideos();
 
   playVideo("introTo01", false, videos.introTo01.volume);
-}
-
-function playScene02Loop() {
-  currentScene = "scene02Loop";
-  isCrossfading = false;
-
-  stopAllVideos();
-
-  playVideo("scene02BackLoop", true, videos.scene02BackLoop.volume);
-  playVideo("scene02BlobLoop", true, videos.scene02BlobLoop.volume);
 }
 
 function playVideo(id, loopIt, volumeLevel) {
@@ -466,6 +520,8 @@ function drawCurrentScene() {
   if (currentScene === "scene02Loop") {
     drawVideo("scene02BackLoop");
     drawVideo("scene02BlobLoop");
+    drawScene02Reference();
+    drawPronounTexts();
   }
 }
 
@@ -503,6 +559,82 @@ function drawVideo(id, alpha = 1) {
     drawingContext.drawImage(video.el, 0, 0, W, H);
     drawingContext.restore();
   }
+}
+
+function drawScene02Reference() {
+  if (!showScene02Reference) return;
+  if (!scene02ReferenceImage) return;
+
+  push();
+  tint(255, 255 * scene02ReferenceAlpha);
+  image(scene02ReferenceImage, 0, 0, W, H);
+  pop();
+}
+
+function drawPronounTexts() {
+  push();
+
+  textFont(pronounFont);
+  textSize(pronounTextSize);
+  fill(255);
+  noStroke();
+
+  for (let i = 0; i < PRONOUN_TEXTS.length; i++) {
+    let item = PRONOUN_TEXTS[i];
+
+    drawTrackedText(item.label, item.x, item.y, pronounTracking);
+
+    if (showPronounAnchors) {
+      drawPronounAnchor(item.x, item.y, item.label);
+    }
+  }
+
+  pop();
+}
+
+function drawTrackedText(txt, x, y, tracking) {
+  push();
+
+  textFont(pronounFont);
+  textSize(pronounTextSize);
+  textAlign(LEFT, CENTER);
+
+  let totalWidth = 0;
+
+  for (let i = 0; i < txt.length; i++) {
+    totalWidth += textWidth(txt[i]);
+
+    if (i < txt.length - 1) {
+      totalWidth += tracking;
+    }
+  }
+
+  let cursorX = x - totalWidth / 2;
+
+  for (let i = 0; i < txt.length; i++) {
+    text(txt[i], cursorX, y);
+    cursorX += textWidth(txt[i]) + tracking;
+  }
+
+  pop();
+}
+
+function drawPronounAnchor(x, y, label) {
+  push();
+
+  noFill();
+  stroke(255, 0, 180);
+  strokeWeight(3);
+  ellipse(x, y, 18, 18);
+
+  noStroke();
+  fill(255, 0, 180);
+  textFont("Arial");
+  textSize(24);
+  textAlign(CENTER, TOP);
+  text(label + "  " + int(x) + "," + int(y), x, y + 18);
+
+  pop();
 }
 
 function fitCanvasToWindow() {
