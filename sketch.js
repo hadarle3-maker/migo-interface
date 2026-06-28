@@ -11,6 +11,9 @@ let crossfadeStartTime = 0;
 let crossfadeDuration = 0.9;
 let crossfadeLead = 0.18;
 
+let crossfadeFrom = null;
+let crossfadeTo = [];
+
 let handPose;
 let faceMesh;
 let webcam;
@@ -38,6 +41,21 @@ const VIDEO_FILES = {
   scene01Hand: {
     src: "assets/videos/secne01_hand.mp4",
     volume: 1
+  },
+
+  scene02Full: {
+    src: "assets/videos/secen02_full.mp4",
+    volume: 1
+  },
+
+  scene02BackLoop: {
+    src: "assets/videos/secen02_back_loop.mp4",
+    volume: 1
+  },
+
+  scene02BlobLoop: {
+    src: "assets/videos/scene02_loop.webm",
+    volume: 0
   },
 
   back02: {
@@ -281,67 +299,134 @@ function playIntroTo01() {
 
   stopAllVideos();
 
-  let video = videos.introTo01;
+  playVideo("introTo01", false, videos.introTo01.volume);
+}
 
-  video.el.loop = false;
+function playScene02Loop() {
+  currentScene = "scene02Loop";
+  isCrossfading = false;
+
+  stopAllVideos();
+
+  playVideo("scene02BackLoop", true, videos.scene02BackLoop.volume);
+  playVideo("scene02BlobLoop", true, videos.scene02BlobLoop.volume);
+}
+
+function playVideo(id, loopIt, volumeLevel) {
+  let video = videos[id];
+
+  if (!video) return;
+
+  video.el.loop = loopIt;
   video.el.removeAttribute("muted");
   video.el.muted = false;
-  video.el.volume = video.volume;
+  video.el.volume = volumeLevel;
 
   try {
     video.el.currentTime = 0;
   } catch (e) {}
 
   video.el.play().catch(function (err) {
-    console.log("Play intro_to_01 failed:", err);
+    console.log("Play failed:", id, err);
   });
 }
 
 function checkAutoTransition() {
-  if (currentScene !== "introTo01") return;
   if (isCrossfading) return;
 
-  let video = videos.introTo01.el;
+  if (currentScene === "introTo01") {
+    checkVideoEndForCrossfade(
+      "introTo01",
+      "scene01Hand",
+      ["scene01Hand"],
+      false
+    );
+  }
+
+  if (currentScene === "scene01Hand") {
+    checkVideoEndForCrossfade(
+      "scene01Hand",
+      "scene02Full",
+      ["scene02Full"],
+      false
+    );
+  }
+
+  if (currentScene === "scene02Full") {
+    checkVideoEndForCrossfade(
+      "scene02Full",
+      "scene02Loop",
+      ["scene02BackLoop", "scene02BlobLoop"],
+      true
+    );
+  }
+}
+
+function checkVideoEndForCrossfade(fromVideoId, nextSceneName, toVideoIds, loopTargets) {
+  let video = videos[fromVideoId].el;
 
   if (!video.duration) return;
 
   let timeLeft = video.duration - video.currentTime;
 
   if (timeLeft <= crossfadeDuration + crossfadeLead) {
-    startCrossfadeToScene01Hand();
+    startCrossfade(fromVideoId, nextSceneName, toVideoIds, loopTargets);
   }
 }
 
-function startCrossfadeToScene01Hand() {
+function startCrossfade(fromVideoId, nextSceneName, toVideoIds, loopTargets) {
   isCrossfading = true;
   crossfadeStartTime = millis();
 
-  let nextVideo = videos.scene01Hand;
+  crossfadeFrom = fromVideoId;
+  crossfadeTo = toVideoIds;
 
-  nextVideo.el.loop = false;
-  nextVideo.el.removeAttribute("muted");
-  nextVideo.el.muted = false;
-  nextVideo.el.volume = 0;
+  currentScene = nextSceneName;
 
-  try {
-    nextVideo.el.currentTime = 0;
-  } catch (e) {}
+  for (let i = 0; i < toVideoIds.length; i++) {
+    let id = toVideoIds[i];
+    let video = videos[id];
 
-  nextVideo.el.play().catch(function (err) {
-    console.log("Play scene01_hand failed:", err);
-  });
+    video.el.loop = loopTargets;
+    video.el.removeAttribute("muted");
+    video.el.muted = false;
+    video.el.volume = 0;
+
+    try {
+      video.el.currentTime = 0;
+    } catch (e) {}
+
+    video.el.play().catch(function (err) {
+      console.log("Play failed:", id, err);
+    });
+  }
 }
 
-function finishCrossfadeToScene01Hand() {
-  videos.introTo01.el.pause();
-  videos.introTo01.el.volume = videos.introTo01.volume;
+function finishCrossfade() {
+  if (crossfadeFrom && videos[crossfadeFrom]) {
+    videos[crossfadeFrom].el.pause();
+    videos[crossfadeFrom].el.volume = videos[crossfadeFrom].volume;
+  }
 
-  videos.scene01Hand.el.removeAttribute("muted");
-  videos.scene01Hand.el.muted = false;
-  videos.scene01Hand.el.volume = videos.scene01Hand.volume;
+  for (let i = 0; i < crossfadeTo.length; i++) {
+    let id = crossfadeTo[i];
 
-  currentScene = "scene01Hand";
+    if (videos[id]) {
+      videos[id].el.volume = videos[id].volume;
+    }
+  }
+
+  if (
+    crossfadeTo.length === 2 &&
+    crossfadeTo[0] === "scene02BackLoop" &&
+    crossfadeTo[1] === "scene02BlobLoop"
+  ) {
+    currentScene = "scene02Loop";
+  }
+
   isCrossfading = false;
+  crossfadeFrom = null;
+  crossfadeTo = [];
 }
 
 function stopAllVideos() {
@@ -351,42 +436,59 @@ function stopAllVideos() {
     try {
       videos[id].el.currentTime = 0;
     } catch (e) {}
+
+    videos[id].el.volume = videos[id].volume;
   }
 }
 
 function drawCurrentScene() {
+  if (isCrossfading) {
+    drawCrossfade();
+    return;
+  }
+
   if (currentScene === "intro") {
     drawVideo("intro");
   }
 
   if (currentScene === "introTo01") {
-    if (isCrossfading) {
-      drawCrossfade("introTo01", "scene01Hand");
-    } else {
-      drawVideo("introTo01");
-    }
+    drawVideo("introTo01");
   }
 
   if (currentScene === "scene01Hand") {
     drawVideo("scene01Hand");
   }
+
+  if (currentScene === "scene02Full") {
+    drawVideo("scene02Full");
+  }
+
+  if (currentScene === "scene02Loop") {
+    drawVideo("scene02BackLoop");
+    drawVideo("scene02BlobLoop");
+  }
 }
 
-function drawCrossfade(fromId, toId) {
+function drawCrossfade() {
   let p = (millis() - crossfadeStartTime) / (crossfadeDuration * 1000);
   p = constrain(p, 0, 1);
 
-  let fromVideo = videos[fromId];
-  let toVideo = videos[toId];
+  if (crossfadeFrom && videos[crossfadeFrom]) {
+    videos[crossfadeFrom].el.volume = videos[crossfadeFrom].volume * (1 - p);
+    drawVideo(crossfadeFrom, 1 - p);
+  }
 
-  fromVideo.el.volume = fromVideo.volume * (1 - p);
-  toVideo.el.volume = toVideo.volume * p;
+  for (let i = 0; i < crossfadeTo.length; i++) {
+    let id = crossfadeTo[i];
 
-  drawVideo(fromId, 1 - p);
-  drawVideo(toId, p);
+    if (videos[id]) {
+      videos[id].el.volume = videos[id].volume * p;
+      drawVideo(id, p);
+    }
+  }
 
   if (p >= 1) {
-    finishCrossfadeToScene01Hand();
+    finishCrossfade();
   }
 }
 
