@@ -31,12 +31,6 @@ let gestureCooldown = 1400;
 let introSoundUnlocked = false;
 
 let pronounFont;
-let scene02ReferenceImage;
-
-let showScene02Reference = true;
-let scene02ReferenceAlpha = 0.45;
-
-let showPronounAnchors = true;
 
 let pronounTextSize = 200;
 let pronounTracking = -10;
@@ -106,7 +100,6 @@ function preload() {
   faceMesh = ml5.faceMesh({ maxFaces: 1, refineLandmarks: false });
 
   pronounFont = loadFont("assets/fonts/TheBasics_Corporate-LightItalic.ttf");
-  scene02ReferenceImage = loadImage("assets/videos/secen02.png");
 }
 
 function setup() {
@@ -519,9 +512,8 @@ function drawCurrentScene() {
 
   if (currentScene === "scene02Loop") {
     drawVideo("scene02BackLoop");
-    drawVideo("scene02BlobLoop");
-    drawScene02Reference();
     drawPronounTexts();
+    drawVideo("scene02BlobLoop");
   }
 }
 
@@ -534,18 +526,35 @@ function drawCrossfade() {
     drawVideo(crossfadeFrom, 1 - p);
   }
 
-  for (let i = 0; i < crossfadeTo.length; i++) {
-    let id = crossfadeTo[i];
+  if (isCrossfadingToScene02Loop()) {
+    videos.scene02BackLoop.el.volume = videos.scene02BackLoop.volume * p;
+    videos.scene02BlobLoop.el.volume = videos.scene02BlobLoop.volume * p;
 
-    if (videos[id]) {
-      videos[id].el.volume = videos[id].volume * p;
-      drawVideo(id, p);
+    drawVideo("scene02BackLoop", p);
+    drawPronounTexts(p);
+    drawVideo("scene02BlobLoop", p);
+  } else {
+    for (let i = 0; i < crossfadeTo.length; i++) {
+      let id = crossfadeTo[i];
+
+      if (videos[id]) {
+        videos[id].el.volume = videos[id].volume * p;
+        drawVideo(id, p);
+      }
     }
   }
 
   if (p >= 1) {
     finishCrossfade();
   }
+}
+
+function isCrossfadingToScene02Loop() {
+  return (
+    crossfadeTo.length === 2 &&
+    crossfadeTo[0] === "scene02BackLoop" &&
+    crossfadeTo[1] === "scene02BlobLoop"
+  );
 }
 
 function drawVideo(id, alpha = 1) {
@@ -561,43 +570,31 @@ function drawVideo(id, alpha = 1) {
   }
 }
 
-function drawScene02Reference() {
-  if (!showScene02Reference) return;
-  if (!scene02ReferenceImage) return;
-
-  push();
-  tint(255, 255 * scene02ReferenceAlpha);
-  image(scene02ReferenceImage, 0, 0, W, H);
-  pop();
-}
-
-function drawPronounTexts() {
+function drawPronounTexts(alpha = 1) {
   push();
 
   textFont(pronounFont);
   textSize(pronounTextSize);
-  fill(255);
+  fill(255, 255 * alpha);
   noStroke();
 
   for (let i = 0; i < PRONOUN_TEXTS.length; i++) {
     let item = PRONOUN_TEXTS[i];
 
-    drawTrackedText(item.label, item.x, item.y, pronounTracking);
-
-    if (showPronounAnchors) {
-      drawPronounAnchor(item.x, item.y, item.label);
-    }
+    drawTrackedText(item.label, item.x, item.y, pronounTracking, alpha);
   }
 
   pop();
 }
 
-function drawTrackedText(txt, x, y, tracking) {
+function drawTrackedText(txt, x, y, tracking, alpha = 1) {
   push();
 
   textFont(pronounFont);
   textSize(pronounTextSize);
   textAlign(LEFT, CENTER);
+  fill(255, 255 * alpha);
+  noStroke();
 
   let totalWidth = 0;
 
@@ -615,24 +612,6 @@ function drawTrackedText(txt, x, y, tracking) {
     text(txt[i], cursorX, y);
     cursorX += textWidth(txt[i]) + tracking;
   }
-
-  pop();
-}
-
-function drawPronounAnchor(x, y, label) {
-  push();
-
-  noFill();
-  stroke(255, 0, 180);
-  strokeWeight(3);
-  ellipse(x, y, 18, 18);
-
-  noStroke();
-  fill(255, 0, 180);
-  textFont("Arial");
-  textSize(24);
-  textAlign(CENTER, TOP);
-  text(label + "  " + int(x) + "," + int(y), x, y + 18);
 
   pop();
 }
