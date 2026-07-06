@@ -105,6 +105,11 @@ const VIDEO_FILES = {
     volume: 1
   },
 
+  sheLove: {
+    src: "assets/videos/love_she.mp4",
+    volume: 1
+  },
+
   heResult: {
     src: "assets/videos/he_final.mp4",
     volume: 1
@@ -664,6 +669,16 @@ function checkAutoTransition() {
       "videoToVideo"
     );
   }
+
+  if (currentScene === "loveVideo" && currentLoveVideoId === "sheToLove") {
+    checkVideoEndForCrossfade(
+      "sheToLove",
+      "sheLoveVideo",
+      ["sheLove"],
+      false,
+      "videoToVideo"
+    );
+  }
 }
 
 function checkVideoEndForCrossfade(
@@ -818,6 +833,10 @@ function drawCurrentScene() {
 
   if (currentScene === "loveVideo") {
     drawVideo(currentLoveVideoId);
+  }
+
+  if (currentScene === "sheLoveVideo") {
+    drawVideo("sheLove");
   }
 }
 
