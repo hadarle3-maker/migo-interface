@@ -48,6 +48,7 @@ let pronounClosedHoldTime = 250;
 
 let selectedPronoun = "";
 let currentResultVideoId = "";
+let currentLoveVideoId = "";
 
 let pronounScales = [1, 1, 1];
 let pronounHoverScale = 1.12;
@@ -89,13 +90,28 @@ const VIDEO_FILES = {
     volume: 1
   },
 
+  theyToLove: {
+    src: "assets/videos/they_to_love.mp4",
+    volume: 1
+  },
+
   sheResult: {
     src: "assets/videos/she_final.mp4",
     volume: 1
   },
 
+  sheToLove: {
+    src: "assets/videos/she_to_love.mp4",
+    volume: 1
+  },
+
   heResult: {
     src: "assets/videos/he_final.mp4",
+    volume: 1
+  },
+
+  heToLove: {
+    src: "assets/videos/he_to_love.mp4",
     volume: 1
   },
 
@@ -115,19 +131,22 @@ const PRONOUN_TEXTS = [
     label: "They",
     x: 1040,
     y: 150,
-    resultVideo: "theyResult"
+    resultVideo: "theyResult",
+    loveVideo: "theyToLove"
   },
   {
     label: "He",
     x: 615,
     y: 489,
-    resultVideo: "heResult"
+    resultVideo: "heResult",
+    loveVideo: "heToLove"
   },
   {
     label: "She",
     x: 1375,
     y: 460,
-    resultVideo: "sheResult"
+    resultVideo: "sheResult",
+    loveVideo: "sheToLove"
   }
 ];
 
@@ -446,6 +465,7 @@ function selectPronoun(index) {
 
   selectedPronoun = PRONOUN_TEXTS[index].label;
   currentResultVideoId = PRONOUN_TEXTS[index].resultVideo;
+  currentLoveVideoId = PRONOUN_TEXTS[index].loveVideo;
 
   hoveredPronounIndex = -1;
   pronounCandidateIndex = -1;
@@ -552,6 +572,9 @@ function playIntroLoop() {
   currentScene = "intro";
   isCrossfading = false;
   activeTransition = null;
+  selectedPronoun = "";
+  currentResultVideoId = "";
+  currentLoveVideoId = "";
 
   stopAllVideos();
 
@@ -629,6 +652,16 @@ function checkAutoTransition() {
       ["scene02BackLoop", "scene02BlobLoop"],
       true,
       "videoToScene02Loop"
+    );
+  }
+
+  if (currentScene === "pronounResult" && currentResultVideoId && currentLoveVideoId) {
+    checkVideoEndForCrossfade(
+      currentResultVideoId,
+      "loveVideo",
+      [currentLoveVideoId],
+      false,
+      "videoToVideo"
     );
   }
 }
@@ -781,6 +814,10 @@ function drawCurrentScene() {
 
   if (currentScene === "pronounResult") {
     drawVideo(currentResultVideoId);
+  }
+
+  if (currentScene === "loveVideo") {
+    drawVideo(currentLoveVideoId);
   }
 }
 
