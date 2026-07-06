@@ -55,7 +55,7 @@ let pronounScaleEase = 0.14;
 
 const VIDEO_FILES = {
   intro: {
-    src: "assets/videos/intro.mp4",
+    src: "assets/videos/intro_final.mp4",
     volume: 1
   },
 
@@ -65,12 +65,12 @@ const VIDEO_FILES = {
   },
 
   scene01Hand: {
-    src: "assets/videos/secne01_hand.mp4",
+    src: "assets/videos/01_hand_final.mp4",
     volume: 1
   },
 
   scene02Full: {
-    src: "assets/videos/secen02_full.mp4",
+    src: "assets/videos/gender_final.mp4",
     volume: 1
   },
 
@@ -85,17 +85,17 @@ const VIDEO_FILES = {
   },
 
   theyResult: {
-    src: "assets/videos/they.mp4",
+    src: "assets/videos/they_final.mp4",
     volume: 1
   },
 
   sheResult: {
-    src: "assets/videos/she.mp4",
+    src: "assets/videos/she_final.mp4",
     volume: 1
   },
 
   heResult: {
-    src: "assets/videos/he.mp4",
+    src: "assets/videos/he_final.mp4",
     volume: 1
   },
 
