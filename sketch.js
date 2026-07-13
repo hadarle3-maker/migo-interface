@@ -925,9 +925,13 @@ function resetVoiceScanState() {
 }
 
 function detectMouthMovementForVoiceScan() {
+  // אם האלמנט כבר הופעל — לא מפעילים שוב
   if (voiceElementTriggered) return;
+
+  // מחכים קצת אחרי הכניסה למסך כדי שלא יופעל ישר
   if (millis() - voiceLoopEnteredAt < voiceDetectionDelay) return;
 
+  // אם אין פנים — מאפסים
   if (faces.length === 0) {
     mouthPrevRatio = null;
     mouthActivityFrames = 0;
@@ -937,20 +941,26 @@ function detectMouthMovementForVoiceScan() {
   let face = faces[0];
   let ratio = getMouthOpenRatio(face);
 
+  // אם לא הצלחנו לקרוא את הפה — מאפסים
   if (ratio === null) {
     mouthPrevRatio = null;
     mouthActivityFrames = 0;
     return;
   }
 
-  let movement = 0;
-
-  if (mouthPrevRatio !== null) {
-    movement = abs(ratio - mouthPrevRatio);
+  // בפריים הראשון רק שומרים ערך, לא מפעילים כלום
+  if (mouthPrevRatio === null) {
+    mouthPrevRatio = ratio;
+    mouthActivityFrames = 0;
+    return;
   }
 
+  // בודקים רק שינוי בין פריים לפריים
+  // לא מפעילים לפי זה שהפה "פתוח", אלא רק לפי תנועה
+  let movement = abs(ratio - mouthPrevRatio);
+
   let mouthLooksActive =
-    ratio > mouthOpenThreshold || movement > mouthMovementDeltaThreshold;
+    movement > mouthMovementDeltaThreshold;
 
   if (mouthLooksActive) {
     mouthActivityFrames++;
@@ -960,6 +970,17 @@ function detectMouthMovementForVoiceScan() {
 
   mouthPrevRatio = ratio;
 
+  // לוג זמני לבדיקה — אפשר למחוק אחר כך
+  console.log(
+    "mouth ratio:",
+    ratio,
+    "movement:",
+    movement,
+    "frames:",
+    mouthActivityFrames
+  );
+
+  // רק אחרי כמה פריימים של תנועה אמיתית מפעילים
   if (mouthActivityFrames >= mouthActivityFramesNeeded) {
     triggerVoiceScanElement("mouth movement");
   }
