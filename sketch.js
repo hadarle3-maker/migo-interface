@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V15 - VOICE SCAN SENSITIVE MOUTH DETECTION");
+console.log("MIGO FLOW V16 - VOICE SCAN TO SEASONS");
 
 let W = 1920;
 let H = 1080;
@@ -245,6 +245,15 @@ const VIDEO_FILES = {
     customLoop: false,
     startAt: 0,
     endTrim: 0
+  },
+
+  scene06Seasons: {
+    src: "assets/videos/scene_06_seasons.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0.18
   }
 };
 
@@ -1072,7 +1081,7 @@ function checkVoiceElementEnd() {
 
   if (timeLeft <= crossfadeDuration) {
     voiceElementPlaying = false;
-    startCrossfade("scene05VoiceLoop", "successScreen");
+    startCrossfade("scene05VoiceLoop", "scene06Seasons");
   }
 }
 
@@ -1719,6 +1728,11 @@ function keyPressed() {
   // קיצור בדיקה למסך הלופ של Voice Scan
   if (key === "5") {
     playScene("scene05VoiceLoop");
+  }
+
+  // קיצור בדיקה לסצנת העונות
+  if (key === "6") {
+    playScene("scene06Seasons");
   }
 }
 
