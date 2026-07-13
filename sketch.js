@@ -95,9 +95,9 @@ let mouthActivityFrames = 0;
 
 // רגישות זיהוי פה
 let mouthOpenThreshold = 0.055;
-let mouthMovementDeltaThreshold = 0.006;
-let mouthActivityFramesNeeded = 5;
-let voiceDetectionDelay = 700;
+let mouthMovementDeltaThreshold = 0.014;
+let mouthActivityFramesNeeded = 12;
+let voiceDetectionDelay = 2000;
 
 const VIDEO_FILES = {
   logoLoop: {
