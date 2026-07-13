@@ -85,12 +85,12 @@ function setup() {
   cnv = createCanvas(W, H);
   pixelDensity(1);
 
+  document.documentElement.style.backgroundColor = "black";
   document.body.style.margin = "0";
+  document.body.style.padding = "0";
   document.body.style.overflow = "hidden";
   document.body.style.backgroundColor = "black";
 
-  // מסתירים את הקנבס עד שהפריים הראשון מוכן.
-  // זה מונע את הפייד/רגע שחור בתחילת האתר.
   cnv.elt.style.visibility = "hidden";
 
   fitCanvasToWindow();
