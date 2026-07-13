@@ -105,14 +105,14 @@ const yesNoColor = [255, 0, 0, 255];
 const YES_NO_POSITIONS = {
   yes: {
     label: "Yes",
-    x: 620,
-    y: 307.3414,
+    x: 697.3912,
+    y: 257,
   },
 
   no: {
     label: "No",
-    x: 1180,
-    y: 562.3414,
+    x: 1216.677,
+    y: 512,
   },
 };
 
