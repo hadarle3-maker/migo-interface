@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V09 - SCENE 02 CHOICE HOVER FIXES");
+console.log("MIGO FLOW V10 - SCENE 02 PRONOUN SELECTION");
 
 let W = 1920;
 let H = 1080;
@@ -43,6 +43,14 @@ let openHoldTime = 350;
 let closedHoldTime = 250;
 let lastHandGestureTime = 0;
 let gestureCooldown = 1400;
+
+// מחוות יד לבחירת He / She / They
+let choiceGesturePhase = "waitingOpen";
+let choiceOpenSince = 0;
+let choiceClosedSince = 0;
+let choiceTargetKey = "";
+let lastChoiceGestureTime = 0;
+let choiceGestureCooldown = 1400;
 
 // מחוון יד / hover
 let mirrorHandX = true;
@@ -125,6 +133,33 @@ const VIDEO_FILES = {
     customLoop: false,
     startAt: 0,
     endTrim: 0
+  },
+
+  scene02AnsShe: {
+    src: "assets/videos/secen_02_ans_she.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
+  },
+
+  scene02AnsHe: {
+    src: "assets/videos/secen_02_ans_he.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
+  },
+
+  scene02AnsThey: {
+    src: "assets/videos/secen_02_ans_they.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
   }
 };
 
@@ -146,6 +181,12 @@ const PRONOUN_POSITIONS = {
     x: 958.8,
     y: 165
   }
+};
+
+const PRONOUN_ANSWER_VIDEOS = {
+  he: "scene02AnsHe",
+  she: "scene02AnsShe",
+  they: "scene02AnsThey"
 };
 
 function preload() {
@@ -296,6 +337,7 @@ function playScene(id) {
     isCrossfading = false;
     activeTransition = null;
 
+    resetChoiceGesture();
     stopAllVideos();
     startScene02ChoiceVideos(true);
 
@@ -335,6 +377,23 @@ function playScene(id) {
 function startScene02ChoiceVideos(resetToStart) {
   startLayerLoopVideo("scene02Background", resetToStart);
   startLayerLoopVideo("scene02BlobLoop", resetToStart);
+}
+
+function stopScene02ChoiceVideos() {
+  stopSingleVideo("scene02Background");
+  stopSingleVideo("scene02BlobLoop");
+}
+
+function stopSingleVideo(id) {
+  if (!videos[id]) return;
+
+  videos[id].el.pause();
+  videos[id].el.loop = false;
+  videos[id].el.volume = 0;
+
+  try {
+    videos[id].el.currentTime = VIDEO_FILES[id].startAt || 0;
+  } catch (e) {}
 }
 
 function startLayerLoopVideo(id, resetToStart) {
@@ -433,6 +492,10 @@ function updateInteraction() {
 
   if (currentScene === "logoLoop" && !isCrossfading) {
     detectOpenCloseHandToContinue();
+  }
+
+  if (currentScene === "scene02Choice" && !isCrossfading) {
+    detectPronounSelection();
   }
 }
 
@@ -563,6 +626,93 @@ function detectOpenCloseHandToContinue() {
   }
 }
 
+function detectPronounSelection() {
+  if (hands.length === 0 || !handCursor.visible) {
+    resetChoiceGesture();
+    return;
+  }
+
+  let hoveredKey = getHoveredPronounKey();
+
+  if (!hoveredKey) {
+    resetChoiceGesture();
+    return;
+  }
+
+  let hand = hands[0];
+  let state = getHandOpenCloseState(hand);
+  let now = millis();
+
+  if (choiceGesturePhase === "waitingOpen") {
+    if (state === "open") {
+      if (choiceOpenSince === 0 || choiceTargetKey !== hoveredKey) {
+        choiceOpenSince = now;
+        choiceTargetKey = hoveredKey;
+      }
+
+      if (now - choiceOpenSince > openHoldTime) {
+        choiceGesturePhase = "waitingClosed";
+        choiceClosedSince = 0;
+      }
+    } else {
+      choiceOpenSince = 0;
+      choiceTargetKey = hoveredKey;
+    }
+  }
+
+  if (choiceGesturePhase === "waitingClosed") {
+    if (hoveredKey !== choiceTargetKey) {
+      resetChoiceGesture();
+      return;
+    }
+
+    if (state === "closed") {
+      if (choiceClosedSince === 0) {
+        choiceClosedSince = now;
+      }
+
+      if (
+        now - choiceClosedSince > closedHoldTime &&
+        now - lastChoiceGestureTime > choiceGestureCooldown
+      ) {
+        lastChoiceGestureTime = now;
+        selectPronoun(hoveredKey);
+      }
+    } else {
+      choiceClosedSince = 0;
+    }
+  }
+}
+
+function resetChoiceGesture() {
+  choiceGesturePhase = "waitingOpen";
+  choiceOpenSince = 0;
+  choiceClosedSince = 0;
+  choiceTargetKey = "";
+}
+
+function selectPronoun(keyName) {
+  let answerVideoId = PRONOUN_ANSWER_VIDEOS[keyName];
+
+  if (!answerVideoId) {
+    console.log("Missing answer for:", keyName);
+    return;
+  }
+
+  console.log("PRONOUN SELECTED:", keyName, "->", answerVideoId);
+
+  resetChoiceGesture();
+  startCrossfade("scene02Choice", answerVideoId);
+}
+
+function getHoveredPronounKey() {
+  if (isCursorOverPronoun("he")) return "he";
+  if (isCursorOverPronoun("she")) return "she";
+  if (isCursorOverPronoun("they")) return "they";
+
+  return "";
+}
+
 function getHandOpenCloseState(hand) {
   let wrist = getHandPoint(hand, 0);
 
@@ -647,9 +797,11 @@ function checkAutoTransition() {
   }
 }
 
-function checkVideoEndForCrossfade(fromVideoId, toSceneId) {
-  let fromVideo = videos[fromVideoId].el;
-  let fromDef = VIDEO_FILES[fromVideoId];
+function checkVideoEndForCrossfade(fromSceneId, toSceneId) {
+  if (!videos[fromSceneId]) return;
+
+  let fromVideo = videos[fromSceneId].el;
+  let fromDef = VIDEO_FILES[fromSceneId];
 
   if (!fromVideo.duration) return;
 
@@ -658,24 +810,25 @@ function checkVideoEndForCrossfade(fromVideoId, toSceneId) {
   let timeLeft = virtualEnd - fromVideo.currentTime;
 
   if (timeLeft <= crossfadeDuration) {
-    startCrossfade(fromVideoId, toSceneId);
+    startCrossfade(fromSceneId, toSceneId);
   }
 }
 
-function startCrossfade(fromVideoId, toSceneId) {
+function startCrossfade(fromSceneId, toSceneId) {
   if (isCrossfading) return;
 
-  let fromVideo = videos[fromVideoId];
+  let fromIsChoice = fromSceneId === "scene02Choice";
+  let fromIsVideo = !!videos[fromSceneId];
 
-  if (!fromVideo) {
-    console.log("Missing crossfade from video:", fromVideoId);
+  if (!fromIsChoice && !fromIsVideo) {
+    console.log("Missing crossfade from scene:", fromSceneId);
     return;
   }
 
   isCrossfading = true;
 
   activeTransition = {
-    fromVideoId: fromVideoId,
+    fromSceneId: fromSceneId,
     toSceneId: toSceneId,
     fadeStarted: false,
     fadeStartTime: 0
@@ -722,12 +875,16 @@ function isTransitionTargetReady(toSceneId) {
 function finishCrossfade() {
   if (!activeTransition) return;
 
-  let fromVideoId = activeTransition.fromVideoId;
+  let fromSceneId = activeTransition.fromSceneId;
   let toSceneId = activeTransition.toSceneId;
 
-  if (videos[fromVideoId]) {
-    videos[fromVideoId].el.pause();
-    videos[fromVideoId].el.volume = 0;
+  if (fromSceneId === "scene02Choice") {
+    stopScene02ChoiceVideos();
+  }
+
+  if (videos[fromSceneId]) {
+    videos[fromSceneId].el.pause();
+    videos[fromSceneId].el.volume = 0;
   }
 
   currentScene = toSceneId;
@@ -755,7 +912,7 @@ function drawCurrentScene() {
   }
 
   if (currentScene === "scene02Choice") {
-    drawScene02Choice(1);
+    drawScene02Choice(1, true);
     return;
   }
 
@@ -765,15 +922,11 @@ function drawCurrentScene() {
 function drawCrossfade() {
   if (!activeTransition) return;
 
-  let fromVideoId = activeTransition.fromVideoId;
+  let fromSceneId = activeTransition.fromSceneId;
   let toSceneId = activeTransition.toSceneId;
 
-  let fromVideo = videos[fromVideoId];
-
-  if (!fromVideo) return;
-
   if (!isTransitionTargetReady(toSceneId)) {
-    drawVideo(fromVideoId, 1);
+    drawSceneById(fromSceneId, 1, false);
     return;
   }
 
@@ -788,18 +941,15 @@ function drawCrossfade() {
 
   p = constrain(p, 0, 1);
 
-  // הסרטון היוצא נשאר מלא, והיעד עולה מעליו.
+  // הסצנה היוצאת נשארת מלאה, והיעד עולה מעליה.
   // זה מונע נפילה לשחור.
-  drawVideo(fromVideoId, 1);
-
-  if (toSceneId === "scene02Choice") {
-    drawScene02Choice(p);
-  } else {
-    drawVideo(toSceneId, p);
-  }
+  drawSceneById(fromSceneId, 1, false);
+  drawSceneById(toSceneId, p, true);
 
   if (audioUnlocked) {
-    fromVideo.el.volume = VIDEO_FILES[fromVideoId].volume * (1 - p);
+    if (videos[fromSceneId]) {
+      videos[fromSceneId].el.volume = VIDEO_FILES[fromSceneId].volume * (1 - p);
+    }
 
     if (videos[toSceneId]) {
       videos[toSceneId].el.volume = VIDEO_FILES[toSceneId].volume * p;
@@ -809,6 +959,15 @@ function drawCrossfade() {
   if (p >= 1) {
     finishCrossfade();
   }
+}
+
+function drawSceneById(sceneId, alpha = 1, showCursor = true) {
+  if (sceneId === "scene02Choice") {
+    drawScene02Choice(alpha, showCursor);
+    return;
+  }
+
+  drawVideo(sceneId, alpha);
 }
 
 function drawVideo(id, alpha = 1) {
@@ -829,7 +988,7 @@ function drawVideo(id, alpha = 1) {
   }
 }
 
-function drawScene02Choice(alpha = 1) {
+function drawScene02Choice(alpha = 1, showCursor = true) {
   if (!firstFrameShown) {
     cnv.elt.style.visibility = "visible";
     firstFrameShown = true;
@@ -848,10 +1007,12 @@ function drawScene02Choice(alpha = 1) {
   drawVideo("scene02BlobLoop", alpha);
 
   // מחוון יד מעל הכול
-  drawingContext.save();
-  drawingContext.globalAlpha = alpha;
-  drawHandCursor();
-  drawingContext.restore();
+  if (showCursor) {
+    drawingContext.save();
+    drawingContext.globalAlpha = alpha;
+    drawHandCursor();
+    drawingContext.restore();
+  }
 }
 
 function drawPronounTexts() {
@@ -1043,6 +1204,19 @@ function keyPressed() {
   if (key === "m" || key === "M") {
     mirrorHandX = !mirrorHandX;
     console.log("mirrorHandX:", mirrorHandX);
+  }
+
+  // בדיקות מהירות לבחירה בלי יד
+  if (key === "1" && currentScene === "scene02Choice") {
+    selectPronoun("he");
+  }
+
+  if (key === "2" && currentScene === "scene02Choice") {
+    selectPronoun("she");
+  }
+
+  if (key === "3" && currentScene === "scene02Choice") {
+    selectPronoun("they");
   }
 }
 
