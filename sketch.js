@@ -394,7 +394,7 @@ const PRONOUN_POSITIONS = {
 const SEASON_POSITIONS = {
   summer: {
     label: "Summer",
-    x: 1359.4389,
+    x: 1359,
     y: 260,
   },
 
@@ -406,13 +406,13 @@ const SEASON_POSITIONS = {
 
   spring: {
     label: "Spring",
-    x: 656.677,
+    x: 656,
     y: 165,
   },
 
   autumn: {
     label: "Autumn",
-    x: 577.3913,
+    x: 577,
     y: 407,
   },
 };
