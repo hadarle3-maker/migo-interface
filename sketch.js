@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V26 - QA BACKGROUND TEXT AND LOOP");
+console.log("MIGO FLOW V27 - FINAL MORPH AND NO TERMS FLOW");
 
 const W = 1920;
 const H = 1080;
@@ -34,6 +34,10 @@ const seasonLoopCrossfadeDuration = 0.5;
 const seasonBrowseCrossfadeDuration = 0.35;
 const seasonToQaCrossfadeDuration = 0.5;
 const qaChoiceCrossfadeDuration = 0.5;
+const qaAnswerCrossfadeDuration = 0.5;
+const noTermsToMorfCrossfadeDuration = 0.5;
+const noTermsReturnCrossfadeDuration = 0.65;
+const noTermsReturnDelayMs = 10000;
 
 // פתיחת אודיו באמצעות זיהוי פנים
 let faceSeenSince = 0;
@@ -56,6 +60,7 @@ let seasonGesture = createChoiceGesture();
 let arrowGesture = createChoiceGesture();
 let seasonConfirmGesture = createChoiceGesture();
 let yesNoGesture = createChoiceGesture();
+let noTermsOverrideGesture = createChoiceGesture();
 
 function createChoiceGesture() {
   return {
@@ -98,8 +103,12 @@ const yesNoBaseSize = 240;
 const yesNoHoverScale = 1.3;
 const yesNoTracking = -10;
 
-// אותו צבע ואותו אופסיטי כמו They ושאר טקסטי הבחירה
-const yesNoColor = [168, 161, 225, 71];
+const yesNoColor = [
+  168,
+  161,
+  225,
+  71,
+];
 
 const YES_NO_POSITIONS = {
   yes: {
@@ -121,6 +130,10 @@ let yesNoHoverScales = {
 };
 
 let selectedYesNo = null;
+
+// מצב סרטון ה־No וההמתנה לפני החזרה ללוגו
+let noTermsEndedAt = 0;
+let noTermsWaitingForReturn = false;
 
 // העונה שמוצגת כרגע
 let currentSeason = null;
@@ -165,7 +178,12 @@ const SEASON_CONFIRM_ZONE = {
 const pronounBaseSize = 240;
 const pronounHoverScale = 1.3;
 const pronounTracking = -10;
-const pronounColor = [168, 161, 225, 71];
+const pronounColor = [
+  168,
+  161,
+  225,
+  71,
+];
 
 let pronounHoverScales = {
   he: 1,
@@ -177,7 +195,12 @@ let pronounHoverScales = {
 const seasonBaseSize = 180;
 const seasonHoverScale = 1.3;
 const seasonTracking = -10;
-const seasonColor = [168, 161, 225, 71];
+const seasonColor = [
+  168,
+  161,
+  225,
+  71,
+];
 
 let seasonHoverScales = {
   summer: 1,
@@ -375,7 +398,6 @@ const VIDEO_FILES = {
     endTrim: 0,
   },
 
-  // הבחירה הראשונית
   scene06SummerIn: {
     src: "assets/videos/scene_06_seasons_summer_in.mp4",
     volume: 1,
@@ -408,7 +430,6 @@ const VIDEO_FILES = {
     endTrim: 0.18,
   },
 
-  // לופים
   scene06SpringLoop: {
     src: "assets/videos/secen_06_Seasons_spring_loop.mp4",
     volume: 1,
@@ -441,7 +462,6 @@ const VIDEO_FILES = {
     endTrim: 0,
   },
 
-  // Fade In
   scene06SpringFadeIn: {
     src: "assets/videos/secen_06_Seasons_spring_fade_in.mp4",
     volume: 1,
@@ -474,7 +494,6 @@ const VIDEO_FILES = {
     endTrim: 0,
   },
 
-  // Fade Out
   scene06SpringFadeOut: {
     src: "assets/videos/secen_06_Seasons_spring_fade_out.mp4",
     volume: 1,
@@ -507,7 +526,6 @@ const VIDEO_FILES = {
     endTrim: 0,
   },
 
-  // המעבר ל־QA בהתאם לעונה שנשמרה
   scene07AutumnToQa: {
     src: "assets/videos/scene_07_autumn_to_qa.mp4",
     volume: 1,
@@ -540,7 +558,6 @@ const VIDEO_FILES = {
     endTrim: 0,
   },
 
-  // מסך בחירת Yes / No — רקע, טקסטים ולופ מעל
   scene07QaBackground: {
     src: "assets/videos/secen_07_qa_background.mp4",
     volume: 0,
@@ -553,6 +570,48 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_07_seasons_loop_new.webm",
     volume: 0,
     loop: true,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  // סרטוני ה־morph הסופיים לפי העונה שנשמרה
+  scene08AutumnMorf: {
+    src: "assets/videos/scene_08_autumn_morf.mp4",
+    volume: 1,
+    loop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene08SpringMorf: {
+    src: "assets/videos/scene_08_spring_morf.mp4",
+    volume: 1,
+    loop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene08SummerMorf: {
+    src: "assets/videos/scene_08_summer_morf.mp4",
+    volume: 1,
+    loop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene08WinterMorf: {
+    src: "assets/videos/scene_08_winter_morf.mp4",
+    volume: 1,
+    loop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  // הסרטון שמופעל כאשר נבחר No
+  scene08QaToTerms: {
+    src: "assets/videos/scene_08_qa_to_terms.mp4",
+    volume: 1,
+    loop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -657,6 +716,13 @@ const SEASON_TO_QA_VIDEOS = {
   summer: "scene07SummerToQa",
   autumn: "scene07AutumnToQa",
   winter: "scene07WinterToQa",
+};
+
+const SEASON_TO_MORF_VIDEOS = {
+  spring: "scene08SpringMorf",
+  summer: "scene08SummerMorf",
+  autumn: "scene08AutumnMorf",
+  winter: "scene08WinterMorf",
 };
 
 const AUTO_TRANSITIONS = {
@@ -1449,6 +1515,23 @@ function updateInteraction() {
       selectYesNoAnswer,
     );
   }
+
+  // לאורך סרטון ה־No:
+  // פותחים שוב את היד ואז סוגרים כדי לעבור למסלול Yes
+  if (
+    currentScene ===
+      "scene08QaToTerms" &&
+    !isCrossfading &&
+    !noTermsWaitingForReturn
+  ) {
+    detectChoiceSelection(
+      noTermsOverrideGesture,
+      handCursor.visible
+        ? "overrideToYes"
+        : "",
+      switchNoToSelectedMorf,
+    );
+  }
 }
 
 function detectFaceForSound() {
@@ -1974,6 +2057,202 @@ function selectYesNoAnswer(answerKey) {
   resetChoiceGesture(
     yesNoGesture,
   );
+
+  if (answerKey === "yes") {
+    playSelectedSeasonMorf(
+      "scene07YesNoChoice",
+      qaAnswerCrossfadeDuration,
+      "yes choice",
+    );
+
+    return;
+  }
+
+  if (answerKey === "no") {
+    resetNoTermsState();
+
+    startCrossfade(
+      "scene07YesNoChoice",
+      "scene08QaToTerms",
+      qaAnswerCrossfadeDuration,
+    );
+  }
+}
+
+function getSelectedSeasonMorfVideo() {
+  if (!selectedSeason) {
+    console.log(
+      "NO FINAL SEASON SAVED FOR MORPH",
+    );
+
+    return null;
+  }
+
+  let targetVideo =
+    SEASON_TO_MORF_VIDEOS[
+      selectedSeason
+    ];
+
+  if (!targetVideo) {
+    console.log(
+      "MISSING MORPH VIDEO FOR SEASON:",
+      selectedSeason,
+    );
+
+    return null;
+  }
+
+  return targetVideo;
+}
+
+function playSelectedSeasonMorf(
+  fromSceneId,
+  transitionDuration =
+    qaAnswerCrossfadeDuration,
+  reason = "unknown",
+) {
+  let targetVideo =
+    getSelectedSeasonMorfVideo();
+
+  if (!targetVideo) return;
+
+  console.log(
+    "PLAYING SELECTED SEASON MORPH:",
+    selectedSeason,
+    "reason:",
+    reason,
+  );
+
+  startCrossfade(
+    fromSceneId,
+    targetVideo,
+    transitionDuration,
+  );
+}
+
+function switchNoToSelectedMorf() {
+  if (
+    currentScene !==
+      "scene08QaToTerms" ||
+    isCrossfading
+  ) {
+    return;
+  }
+
+  selectedYesNo = "yes";
+  window.selectedYesNo = "yes";
+
+  resetChoiceGesture(
+    noTermsOverrideGesture,
+  );
+
+  noTermsEndedAt = 0;
+  noTermsWaitingForReturn = false;
+
+  playSelectedSeasonMorf(
+    "scene08QaToTerms",
+    noTermsToMorfCrossfadeDuration,
+    "hand closed during No video",
+  );
+}
+
+function resetNoTermsState() {
+  noTermsEndedAt = 0;
+  noTermsWaitingForReturn = false;
+
+  resetChoiceGesture(
+    noTermsOverrideGesture,
+  );
+}
+
+function checkNoTermsFlow() {
+  let video =
+    videos.scene08QaToTerms;
+
+  if (
+    !video ||
+    !video.el.duration
+  ) {
+    return;
+  }
+
+  let videoEnded =
+    video.el.ended ||
+    video.el.currentTime >=
+      video.el.duration - 0.05;
+
+  if (
+    !noTermsWaitingForReturn &&
+    videoEnded
+  ) {
+    noTermsWaitingForReturn = true;
+    noTermsEndedAt = millis();
+
+    // משאירים את הפריים האחרון קפוא בזמן ההמתנה
+    video.el.pause();
+
+    try {
+      video.el.currentTime = max(
+        0,
+        video.el.duration - 0.03,
+      );
+    } catch (e) {}
+
+    console.log(
+      "NO VIDEO ENDED. RETURNING TO LOGO IN 10 SECONDS.",
+    );
+
+    return;
+  }
+
+  if (
+    noTermsWaitingForReturn &&
+    millis() - noTermsEndedAt >=
+      noTermsReturnDelayMs
+  ) {
+    resetExperienceValues();
+
+    startCrossfade(
+      "scene08QaToTerms",
+      "logoLoop",
+      noTermsReturnCrossfadeDuration,
+    );
+  }
+}
+
+function resetExperienceValues() {
+  currentSeason = null;
+  selectedSeason = null;
+  pendingSeason = null;
+  selectedYesNo = null;
+
+  window.selectedSeason = null;
+  window.selectedYesNo = null;
+
+  resetOpeningGesture();
+  openingGesture.lastGestureTime = 0;
+
+  resetChoiceGesture(
+    pronounGesture,
+  );
+
+  resetChoiceGesture(
+    seasonGesture,
+  );
+
+  resetChoiceGesture(
+    arrowGesture,
+  );
+
+  resetChoiceGesture(
+    seasonConfirmGesture,
+  );
+
+  resetChoiceGesture(
+    yesNoGesture,
+  );
+
+  resetNoTermsState();
 }
 
 function getHoveredArrowKey() {
@@ -2567,9 +2846,17 @@ function checkAutoTransition() {
 
   if (
     currentScene ===
-    "scene05VoiceLoop"
+      "scene05VoiceLoop"
   ) {
     checkVoiceElementEnd();
+    return;
+  }
+
+  if (
+    currentScene ===
+      "scene08QaToTerms"
+  ) {
+    checkNoTermsFlow();
     return;
   }
 
@@ -2838,11 +3125,25 @@ function finishCrossfade() {
 
   if (
     currentScene ===
-    "scene07YesNoChoice"
+      "scene07YesNoChoice"
   ) {
     resetChoiceGesture(
       yesNoGesture,
     );
+  }
+
+  if (
+    currentScene ===
+      "scene08QaToTerms"
+  ) {
+    resetNoTermsState();
+  }
+
+  if (
+    fromSceneId ===
+      "scene08QaToTerms"
+  ) {
+    resetNoTermsState();
   }
 
   if (videos[toSceneId]) {
@@ -3604,7 +3905,7 @@ function drawYesNoChoiceScene(
     alpha,
   );
 
-  // שכבה 2: הטקסטים
+  // שכבה 2: טקסטים
   drawingContext.save();
 
   drawingContext.globalAlpha =
@@ -3614,7 +3915,7 @@ function drawYesNoChoiceScene(
 
   drawingContext.restore();
 
-  // שכבה 3: הלופ השקוף מעל הטקסטים
+  // שכבה 3: הלופ השקוף
   drawVideo(
     "scene07QaLoop",
     alpha,
@@ -3959,8 +4260,21 @@ function keyPressed() {
     confirmCurrentSeason();
   }
 
-  // מעבר ישיר למסך החדש
+  // מעבר ישיר למסך Yes / No
+  // לצורך בדיקה, אם אין בחירה שמורה מוגדרת Spring
   if (key === "8") {
+    if (!selectedSeason) {
+      selectedSeason = "spring";
+      currentSeason = "spring";
+
+      window.selectedSeason =
+        selectedSeason;
+
+      console.log(
+        "DEBUG SEASON SET TO SPRING",
+      );
+    }
+
     playScene(
       "scene07YesNoChoice",
     );
@@ -3984,6 +4298,35 @@ function keyPressed() {
     selectYesNoAnswer(
       "no",
     );
+  }
+
+  // מעבר ישיר לסרטון No
+  if (key === "9") {
+    if (!selectedSeason) {
+      selectedSeason = "spring";
+      currentSeason = "spring";
+
+      window.selectedSeason =
+        selectedSeason;
+    }
+
+    resetNoTermsState();
+
+    playScene(
+      "scene08QaToTerms",
+    );
+  }
+
+  // X מדמה סגירת יד במהלך סרטון No
+  if (
+    (
+      key === "x" ||
+      key === "X"
+    ) &&
+    currentScene ===
+      "scene08QaToTerms"
+  ) {
+    switchNoToSelectedMorf();
   }
 }
 
