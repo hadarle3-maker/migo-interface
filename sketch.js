@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V29 - MORPH TO FINAL FILM");
+console.log("MIGO FLOW V30 - STABLE MORPH HOLD + FINAL RETURN");
 
 const W = 1920;
 const H = 1080;
@@ -58,6 +58,9 @@ const noTermsReturnDelayMs = 10000;
 // קפוא במשך 2.5 שניות ואז עוברות לסרטון הסופי.
 const morfToFinalDelayMs = 2500;
 const morfToFinalCrossfadeDuration = 0.65;
+
+// בסיום הסרטון הסופי חוזרות בצורה חלקה להתחלה.
+const finalToLogoCrossfadeDuration = 0.65;
 
 // פתיחת אודיו באמצעות זיהוי פנים
 let faceSeenSince = 0;
@@ -169,6 +172,15 @@ let noTermsWaitingForReturn = false;
 // מצב ההמתנה בין סיום ה־morph לסרטון הסופי
 let morfEndedAt = 0;
 let morfWaitingForFinal = false;
+
+// שומרות צילום אמיתי של הפריים האחרון של ה־morph.
+// כך אין Seek לאחור שעלול להחזיר לרגע את מסך ה־Yes / No.
+let morfFreezeCanvas = null;
+let morfFreezeReady = false;
+let morfFreezeSceneId = null;
+
+// מונע הפעלה כפולה של החזרה להתחלה בסוף הסרטון הסופי.
+let migoFinalReturningToStart = false;
 
 // העונה שמוצגת כרגע
 let currentSeason = null;
@@ -1059,6 +1071,15 @@ function setup() {
   );
 
   cnv = createCanvas(W, H);
+
+  // Canvas פנימי ששומר את הפריים האחרון של סרטון ה־morph.
+  morfFreezeCanvas =
+    document.createElement(
+      "canvas",
+    );
+
+  morfFreezeCanvas.width = W;
+  morfFreezeCanvas.height = H;
 
   document.documentElement
     .style.margin = "0";
@@ -2672,6 +2693,104 @@ function isFinalMorfScene(
 function resetMorfToFinalState() {
   morfEndedAt = 0;
   morfWaitingForFinal = false;
+  morfFreezeReady = false;
+  morfFreezeSceneId = null;
+
+  if (morfFreezeCanvas) {
+    let ctx =
+      morfFreezeCanvas.getContext(
+        "2d",
+      );
+
+    ctx.clearRect(
+      0,
+      0,
+      W,
+      H,
+    );
+  }
+}
+
+function captureMorfFreezeFrame(
+  sceneId,
+  videoElement,
+) {
+  if (
+    !morfFreezeCanvas ||
+    !videoElement
+  ) {
+    return false;
+  }
+
+  try {
+    let ctx =
+      morfFreezeCanvas.getContext(
+        "2d",
+      );
+
+    ctx.clearRect(
+      0,
+      0,
+      W,
+      H,
+    );
+
+    ctx.drawImage(
+      videoElement,
+      0,
+      0,
+      W,
+      H,
+    );
+
+    morfFreezeReady = true;
+    morfFreezeSceneId =
+      sceneId;
+
+    console.log(
+      "MORPH LAST FRAME CAPTURED:",
+      sceneId,
+    );
+
+    return true;
+  } catch (err) {
+    console.log(
+      "MORPH FRAME CAPTURE FAILED:",
+      err,
+    );
+
+    morfFreezeReady = false;
+    morfFreezeSceneId =
+      null;
+
+    return false;
+  }
+}
+
+function drawFrozenMorfFrame(
+  alpha = 1,
+) {
+  if (
+    !morfFreezeCanvas ||
+    !morfFreezeReady
+  ) {
+    return;
+  }
+
+  drawingContext.save();
+
+  drawingContext.globalAlpha =
+    alpha;
+
+  drawingContext.drawImage(
+    morfFreezeCanvas,
+    0,
+    0,
+    W,
+    H,
+  );
+
+  drawingContext.restore();
 }
 
 function checkMorfToFinalFlow() {
@@ -2703,24 +2822,21 @@ function checkMorfToFinalFlow() {
     !morfWaitingForFinal &&
     morfEnded
   ) {
+    // קודם מצלמות את הפריים שמוצג כרגע,
+    // ורק אחר כך עוצרות את הסרטון.
+    // חשוב: לא משנות שוב את currentTime.
+    captureMorfFreezeFrame(
+      currentScene,
+      morfVideo.el,
+    );
+
+    morfVideo.el.pause();
+
     morfWaitingForFinal = true;
     morfEndedAt = millis();
 
-    // משאירות את הפריים האחרון של ה־morph קפוא
-    // בזמן ההמתנה לפני הסרטון הסופי.
-    morfVideo.el.pause();
-
-    try {
-      morfVideo.el.currentTime =
-        max(
-          0,
-          morfVideo.el.duration -
-            0.03,
-        );
-    } catch (e) {}
-
     console.log(
-      "MORPH ENDED. PLAYING MIGO FINAL IN 2.5 SECONDS.",
+      "MORPH ENDED. HOLDING THE LAST FRAME FOR 2.5 SECONDS.",
     );
 
     return;
@@ -2738,6 +2854,59 @@ function checkMorfToFinalFlow() {
       morfToFinalCrossfadeDuration,
     );
   }
+}
+
+function resetMigoFinalState() {
+  migoFinalReturningToStart =
+    false;
+}
+
+function checkMigoFinalFlow() {
+  if (
+    currentScene !==
+      "migoFinal" ||
+    migoFinalReturningToStart
+  ) {
+    return;
+  }
+
+  let finalVideo =
+    videos.migoFinal;
+
+  if (
+    !finalVideo ||
+    !finalVideo.el.duration
+  ) {
+    return;
+  }
+
+  let finalEnded =
+    finalVideo.el.ended ||
+    finalVideo.el.currentTime >=
+      finalVideo.el.duration -
+        0.05;
+
+  if (!finalEnded) {
+    return;
+  }
+
+  migoFinalReturningToStart =
+    true;
+
+  // משאירות את הפריים האחרון במקום בזמן המעבר ללוגו.
+  finalVideo.el.pause();
+
+  console.log(
+    "MIGO FINAL ENDED. RETURNING TO START.",
+  );
+
+  resetExperienceValues();
+
+  startCrossfade(
+    "migoFinal",
+    "logoLoop",
+    finalToLogoCrossfadeDuration,
+  );
 }
 
 function resetExperienceValues() {
@@ -2778,6 +2947,7 @@ function resetExperienceValues() {
 
   resetNoTermsState();
   resetMorfToFinalState();
+  resetMigoFinalState();
 }
 
 function getHoveredArrowKey() {
@@ -3452,6 +3622,15 @@ function checkAutoTransition() {
   }
 
   if (
+    currentScene ===
+    "migoFinal"
+  ) {
+    checkMigoFinalFlow();
+
+    return;
+  }
+
+  if (
     SEASON_FADE_OUT_TO_KEY[
       currentScene
     ] &&
@@ -3729,6 +3908,20 @@ function finishCrossfade() {
     resetMorfToFinalState();
   }
 
+  if (
+    currentScene ===
+    "migoFinal"
+  ) {
+    resetMigoFinalState();
+  }
+
+  if (
+    fromSceneId ===
+    "migoFinal"
+  ) {
+    resetMigoFinalState();
+  }
+
   let arrivedSeason =
     SEASON_LOOP_TO_KEY[
       toSceneId
@@ -3971,6 +4164,25 @@ function drawSceneById(
     "successScreen"
   ) {
     drawSuccessScreen(alpha);
+
+    return;
+  }
+
+  // בזמן ההמתנה ואורך המעבר לסרטון הסופי,
+  // מציירות צילום קפוא של סוף ה־morph.
+  // כך לעולם לא רואים שוב את תחילת סרטון ה־morph
+  // או את מסך ה־Yes / No.
+  if (
+    isFinalMorfScene(
+      sceneId,
+    ) &&
+    morfFreezeReady &&
+    morfFreezeSceneId ===
+      sceneId
+  ) {
+    drawFrozenMorfFrame(
+      alpha,
+    );
 
     return;
   }
