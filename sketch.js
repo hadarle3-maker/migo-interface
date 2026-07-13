@@ -27,7 +27,7 @@ const VOICE_SCAN_SOUND_VOLUME = 0.15;
 let isCrossfading = false;
 let activeTransition = null;
 const crossfadeDuration = 0.65;
-const seasonLoopCrossfadeDuration = 0.9;
+const seasonLoopCrossfadeDuration = 0.65;
 
 // פתיחת אודיו באמצעות זיהוי פנים
 let faceSeenSince = 0;
