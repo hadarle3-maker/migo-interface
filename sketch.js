@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V24 - SEASON BROWSING AND FINAL CONFIRMATION");
+console.log("MIGO FLOW V25 - SEASONS TO QA CHOICE");
 
 const W = 1920;
 const H = 1080;
@@ -14,6 +14,7 @@ let hands = [];
 let faces = [];
 let pronounFont;
 let arrowImage;
+let yesNoImage;
 
 let currentScene = "logoLoop";
 let firstFrameShown = false;
@@ -29,9 +30,11 @@ let isCrossfading = false;
 let activeTransition = null;
 
 const crossfadeDuration = 0.65;
-const seasonsIntroCrossfadeDuration = 0.50;
-const seasonLoopCrossfadeDuration = 0.50;
+const seasonsIntroCrossfadeDuration = 0.5;
+const seasonLoopCrossfadeDuration = 0.5;
 const seasonBrowseCrossfadeDuration = 0.35;
+const seasonToQaCrossfadeDuration = 0.5;
+const qaChoiceCrossfadeDuration = 0.5;
 
 // פתיחת אודיו באמצעות זיהוי פנים
 let faceSeenSince = 0;
@@ -53,6 +56,7 @@ let pronounGesture = createChoiceGesture();
 let seasonGesture = createChoiceGesture();
 let arrowGesture = createChoiceGesture();
 let seasonConfirmGesture = createChoiceGesture();
+let yesNoGesture = createChoiceGesture();
 
 function createChoiceGesture() {
   return {
@@ -90,16 +94,45 @@ const SEASON_DISPLAY_NAMES = {
   winter: "Winter",
 };
 
+// בחירת Yes / No
+const yesNoBaseSize = 240;
+const yesNoHoverScale = 1.3;
+const yesNoTracking = -10;
+
+// אדום זמני לצורך כיוון המיקומים
+const yesNoColor = [255, 0, 0, 255];
+
+const YES_NO_POSITIONS = {
+  yes: {
+    label: "Yes",
+    x: 697.3912,
+    y: 307.3414,
+  },
+
+  no: {
+    label: "No",
+    x: 1216.677,
+    y: 562.3414,
+  },
+};
+
+let yesNoHoverScales = {
+  yes: 1,
+  no: 1,
+};
+
+let selectedYesNo = null;
+
 // העונה שמוצגת כרגע
 let currentSeason = null;
 
-// הבחירה הסופית — נשמרת רק באישור במרכז
+// הבחירה הסופית שנשמרת רק בסגירת היד במרכז
 let selectedSeason = null;
 
-// העונה שאליה עוברים כרגע
+// העונה שאליה עוברים כרגע בדפדוף
 let pendingSeason = null;
 
-// הגדרות החצים
+// חצים
 const arrowBaseWidth = 118;
 const arrowBaseHeight = 118;
 const arrowHoverScale = 1.3;
@@ -121,7 +154,7 @@ let arrowHoverScales = {
   next: 1,
 };
 
-// האזור המרכזי שבו סגירת היד מאשרת את העונה
+// אזור האישור המרכזי
 const SEASON_CONFIRM_ZONE = {
   x: W / 2,
   y: H / 2,
@@ -343,7 +376,7 @@ const VIDEO_FILES = {
     endTrim: 0,
   },
 
-  // הבחירה הראשונית — סרטוני כניסה
+  // הבחירה הראשונית
   scene06SummerIn: {
     src: "assets/videos/scene_06_seasons_summer_in.mp4",
     volume: 1,
@@ -376,25 +409,17 @@ const VIDEO_FILES = {
     endTrim: 0.18,
   },
 
-  // לופים של העונות
-  scene06SummerLoop: {
-    src: "assets/videos/secen_06_Seasons_summer_loop.mp4",
-    volume: 1,
-    loop: true,
-    startAt: 0,
-    endTrim: 0,
-  },
-
-  scene06WinterLoop: {
-    src: "assets/videos/secen_06_Seasons_winter_loop.mp4",
-    volume: 1,
-    loop: true,
-    startAt: 0,
-    endTrim: 0,
-  },
-
+  // לופים
   scene06SpringLoop: {
     src: "assets/videos/secen_06_Seasons_spring_loop.mp4",
+    volume: 1,
+    loop: true,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene06SummerLoop: {
+    src: "assets/videos/secen_06_Seasons_summer_loop.mp4",
     volume: 1,
     loop: true,
     startAt: 0,
@@ -409,7 +434,15 @@ const VIDEO_FILES = {
     endTrim: 0,
   },
 
-  // Fade In לדפדוף
+  scene06WinterLoop: {
+    src: "assets/videos/secen_06_Seasons_winter_loop.mp4",
+    volume: 1,
+    loop: true,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  // Fade In
   scene06SpringFadeIn: {
     src: "assets/videos/secen_06_Seasons_spring_fade_in.mp4",
     volume: 1,
@@ -442,7 +475,7 @@ const VIDEO_FILES = {
     endTrim: 0,
   },
 
-  // Fade Out לדפדוף
+  // Fade Out
   scene06SpringFadeOut: {
     src: "assets/videos/secen_06_Seasons_spring_fade_out.mp4",
     volume: 1,
@@ -469,6 +502,39 @@ const VIDEO_FILES = {
 
   scene06WinterFadeOut: {
     src: "assets/videos/secen_06_Seasons_winter_fade_out.mp4",
+    volume: 1,
+    loop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  // המעבר ל־QA בהתאם לעונה שנשמרה
+  scene07AutumnToQa: {
+    src: "assets/videos/scene_07_autumn_to_qa.mp4",
+    volume: 1,
+    loop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene07SpringToQa: {
+    src: "assets/videos/scene_07_spring_to_qa.mp4",
+    volume: 1,
+    loop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene07SummerToQa: {
+    src: "assets/videos/scene_07_summer_to_qa.mp4",
+    volume: 1,
+    loop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene07WinterToQa: {
+    src: "assets/videos/scene_07_winter_to_qa.mp4",
     volume: 1,
     loop: false,
     startAt: 0,
@@ -529,10 +595,10 @@ const PRONOUN_ANSWER_VIDEOS = {
 };
 
 const SEASON_IN_VIDEOS = {
-  summer: "scene06SummerIn",
-  winter: "scene06WinterIn",
   spring: "scene06SpringIn",
+  summer: "scene06SummerIn",
   autumn: "scene06AutumnIn",
+  winter: "scene06WinterIn",
 };
 
 const SEASON_LOOP_VIDEOS = {
@@ -568,6 +634,13 @@ const SEASON_FADE_OUT_TO_KEY = {
   scene06SummerFadeOut: "summer",
   scene06AutumnFadeOut: "autumn",
   scene06WinterFadeOut: "winter",
+};
+
+const SEASON_TO_QA_VIDEOS = {
+  spring: "scene07SpringToQa",
+  summer: "scene07SummerToQa",
+  autumn: "scene07AutumnToQa",
+  winter: "scene07WinterToQa",
 };
 
 const AUTO_TRANSITIONS = {
@@ -620,7 +693,6 @@ const AUTO_TRANSITIONS = {
     duration: seasonsIntroCrossfadeDuration,
   },
 
-  // הבחירה הראשונית
   scene06SpringIn: {
     to: "scene06SpringLoop",
     duration: seasonLoopCrossfadeDuration,
@@ -641,7 +713,6 @@ const AUTO_TRANSITIONS = {
     duration: seasonLoopCrossfadeDuration,
   },
 
-  // אחרי דפדוף: Fade In ואז לופ
   scene06SpringFadeIn: {
     to: "scene06SpringLoop",
     duration: seasonLoopCrossfadeDuration,
@@ -661,6 +732,26 @@ const AUTO_TRANSITIONS = {
     to: "scene06WinterLoop",
     duration: seasonLoopCrossfadeDuration,
   },
+
+  scene07SpringToQa: {
+    to: "scene07YesNoChoice",
+    duration: qaChoiceCrossfadeDuration,
+  },
+
+  scene07SummerToQa: {
+    to: "scene07YesNoChoice",
+    duration: qaChoiceCrossfadeDuration,
+  },
+
+  scene07AutumnToQa: {
+    to: "scene07YesNoChoice",
+    duration: qaChoiceCrossfadeDuration,
+  },
+
+  scene07WinterToQa: {
+    to: "scene07YesNoChoice",
+    duration: qaChoiceCrossfadeDuration,
+  },
 };
 
 function preload() {
@@ -673,11 +764,15 @@ function preload() {
   });
 
   pronounFont = loadFont(
-    "assets/fonts/TheBasics_Corporate-Light.ttf"
+    "assets/fonts/TheBasics_Corporate-Light.ttf",
   );
 
   arrowImage = loadImage(
-    "assets/videos/arrow.png"
+    "assets/videos/arrow.png",
+  );
+
+  yesNoImage = loadImage(
+    "assets/videos/yes_or_no_loop.png",
   );
 }
 
@@ -685,8 +780,8 @@ function setup() {
   pixelDensity(
     min(
       window.devicePixelRatio || 1,
-      2
-    )
+      2,
+    ),
   );
 
   cnv = createCanvas(W, H);
@@ -730,7 +825,7 @@ function loadVideos() {
   for (let id in VIDEO_FILES) {
     videos[id] = createVideoElement(
       id,
-      VIDEO_FILES[id].src
+      VIDEO_FILES[id].src,
     );
   }
 }
@@ -749,7 +844,7 @@ function createVideoElement(id, src) {
   el.setAttribute("playsinline", "");
   el.setAttribute(
     "webkit-playsinline",
-    ""
+    "",
   );
 
   el.addEventListener(
@@ -758,9 +853,9 @@ function createVideoElement(id, src) {
       console.log(
         "VIDEO LOADED:",
         id,
-        src
+        src,
       );
-    }
+    },
   );
 
   el.addEventListener(
@@ -770,9 +865,9 @@ function createVideoElement(id, src) {
         "VIDEO ERROR:",
         id,
         src,
-        el.error
+        el.error,
       );
-    }
+    },
   );
 
   el.load();
@@ -804,7 +899,7 @@ function loadSounds() {
 ----------------------------- */
 
 function unlockAudio(
-  reason = "unknown"
+  reason = "unknown",
 ) {
   if (audioUnlocked) return;
 
@@ -812,14 +907,14 @@ function unlockAudio(
 
   console.log(
     "AUDIO UNLOCKED BY:",
-    reason
+    reason,
   );
 
   for (let id in videos) {
     videos[id].el.muted = false;
 
     videos[id].el.removeAttribute(
-      "muted"
+      "muted",
     );
 
     videos[id].el.volume =
@@ -842,7 +937,7 @@ function unlockAudio(
         console.log(
           "PLAY AFTER AUDIO UNLOCK FAILED:",
           currentScene,
-          err
+          err,
         );
       });
   }
@@ -850,7 +945,7 @@ function unlockAudio(
 
 function applyAudioState(
   id,
-  volumeLevel = null
+  volumeLevel = null,
 ) {
   let video = videos[id];
 
@@ -860,7 +955,7 @@ function applyAudioState(
     video.el.muted = false;
 
     video.el.removeAttribute(
-      "muted"
+      "muted",
     );
 
     video.el.volume =
@@ -892,7 +987,7 @@ function playVoiceScanSound() {
     .catch(function (err) {
       console.log(
         "VOICE SCAN SOUND PLAY FAILED:",
-        err
+        err,
       );
     });
 }
@@ -923,7 +1018,7 @@ function playScene(id) {
 
     startSpecialScene(
       id,
-      true
+      true,
     );
 
     showCanvas();
@@ -935,7 +1030,7 @@ function playScene(id) {
   if (!video) {
     console.log(
       "Missing video:",
-      id
+      id,
     );
 
     return;
@@ -944,14 +1039,14 @@ function playScene(id) {
   startVideo(
     id,
     true,
-    VIDEO_FILES[id].volume
+    VIDEO_FILES[id].volume,
   );
 }
 
 function startVideo(
   id,
   resetToStart,
-  volumeLevel
+  volumeLevel,
 ) {
   let video = videos[id];
 
@@ -962,13 +1057,14 @@ function startVideo(
 
   applyAudioState(
     id,
-    volumeLevel
+    volumeLevel,
   );
 
   if (resetToStart) {
     try {
       video.el.currentTime =
-        VIDEO_FILES[id].startAt || 0;
+        VIDEO_FILES[id].startAt ||
+        0;
     } catch (e) {}
   }
 
@@ -978,7 +1074,7 @@ function startVideo(
       console.log(
         "PLAY FAILED:",
         id,
-        err
+        err,
       );
     });
 }
@@ -997,6 +1093,7 @@ function isSpecialScene(id) {
     id === "scene02Choice" ||
     id === "scene05VoiceLoop" ||
     id === "scene06SeasonsChoice" ||
+    id === "scene07YesNoChoice" ||
     id === "successScreen"
   );
 }
@@ -1004,7 +1101,7 @@ function isSpecialScene(id) {
 function resetSceneGesture(id) {
   if (id === "scene02Choice") {
     resetChoiceGesture(
-      pronounGesture
+      pronounGesture,
     );
   }
 
@@ -1012,41 +1109,49 @@ function resetSceneGesture(id) {
     id === "scene06SeasonsChoice"
   ) {
     resetChoiceGesture(
-      seasonGesture
+      seasonGesture,
+    );
+  }
+
+  if (
+    id === "scene07YesNoChoice"
+  ) {
+    resetChoiceGesture(
+      yesNoGesture,
     );
   }
 }
 
 function startSpecialScene(
   id,
-  resetToStart
+  resetToStart,
 ) {
   if (id === "scene02Choice") {
     startLayerLoopVideo(
       "scene02Background",
-      resetToStart
+      resetToStart,
     );
 
     startLayerLoopVideo(
       "scene02BlobLoop",
-      resetToStart
+      resetToStart,
     );
   }
 
   if (id === "scene05VoiceLoop") {
     startLayerLoopVideo(
       "scene05ScanVoiceBackground",
-      resetToStart
+      resetToStart,
     );
 
     startLayerLoopVideo(
       "scene05ScanVoiceBlob",
-      resetToStart
+      resetToStart,
     );
 
     if (resetToStart) {
       stopSingleVideo(
-        "scene05ScanVoiceElement"
+        "scene05ScanVoiceElement",
       );
 
       resetVoiceScanState();
@@ -1061,12 +1166,23 @@ function startSpecialScene(
   ) {
     startLayerLoopVideo(
       "scene06SeasonsBackground",
-      resetToStart
+      resetToStart,
     );
 
     startLayerLoopVideo(
       "scene06SeasonsBlobLoop",
-      resetToStart
+      resetToStart,
+    );
+  }
+
+  if (
+    id === "scene07YesNoChoice" &&
+    resetToStart
+  ) {
+    selectedYesNo = null;
+
+    resetChoiceGesture(
+      yesNoGesture,
     );
   }
 }
@@ -1074,25 +1190,25 @@ function startSpecialScene(
 function stopSpecialScene(id) {
   if (id === "scene02Choice") {
     stopSingleVideo(
-      "scene02Background"
+      "scene02Background",
     );
 
     stopSingleVideo(
-      "scene02BlobLoop"
+      "scene02BlobLoop",
     );
   }
 
   if (id === "scene05VoiceLoop") {
     stopSingleVideo(
-      "scene05ScanVoiceBackground"
+      "scene05ScanVoiceBackground",
     );
 
     stopSingleVideo(
-      "scene05ScanVoiceElement"
+      "scene05ScanVoiceElement",
     );
 
     stopSingleVideo(
-      "scene05ScanVoiceBlob"
+      "scene05ScanVoiceBlob",
     );
 
     stopVoiceScanSound();
@@ -1103,23 +1219,23 @@ function stopSpecialScene(id) {
     id === "scene06SeasonsChoice"
   ) {
     stopSingleVideo(
-      "scene06SeasonsBackground"
+      "scene06SeasonsBackground",
     );
 
     stopSingleVideo(
-      "scene06SeasonsBlobLoop"
+      "scene06SeasonsBlobLoop",
     );
   }
 }
 
 function startLayerLoopVideo(
   id,
-  resetToStart
+  resetToStart,
 ) {
   startVideo(
     id,
     resetToStart,
-    0
+    0,
   );
 }
 
@@ -1132,7 +1248,8 @@ function stopSingleVideo(id) {
 
   try {
     videos[id].el.currentTime =
-      VIDEO_FILES[id].startAt || 0;
+      VIDEO_FILES[id].startAt ||
+      0;
   } catch (e) {}
 }
 
@@ -1144,7 +1261,8 @@ function stopAllVideos() {
 
     try {
       videos[id].el.currentTime =
-        VIDEO_FILES[id].startAt || 0;
+        VIDEO_FILES[id].startAt ||
+        0;
     } catch (e) {}
   }
 }
@@ -1184,7 +1302,7 @@ function checkManualLoop() {
         console.log(
           "MANUAL LOOP PLAY FAILED:",
           currentScene,
-          err
+          err,
         );
       });
   }
@@ -1210,14 +1328,14 @@ function setupCamera() {
     webcam,
     function (results) {
       hands = results;
-    }
+    },
   );
 
   faceMesh.detectStart(
     webcam,
     function (results) {
       faces = results;
-    }
+    },
   );
 }
 
@@ -1244,7 +1362,7 @@ function updateInteraction() {
     detectChoiceSelection(
       pronounGesture,
       getHoveredPronounKey(),
-      selectPronoun
+      selectPronoun,
     );
   }
 
@@ -1264,7 +1382,7 @@ function updateInteraction() {
     detectChoiceSelection(
       seasonGesture,
       getHoveredSeasonKey(),
-      selectSeason
+      selectSeason,
     );
   }
 
@@ -1275,13 +1393,25 @@ function updateInteraction() {
     detectChoiceSelection(
       arrowGesture,
       getHoveredArrowKey(),
-      navigateSeason
+      navigateSeason,
     );
 
     detectChoiceSelection(
       seasonConfirmGesture,
       getSeasonConfirmKey(),
-      confirmCurrentSeason
+      confirmCurrentSeason,
+    );
+  }
+
+  if (
+    currentScene ===
+      "scene07YesNoChoice" &&
+    !isCrossfading
+  ) {
+    detectChoiceSelection(
+      yesNoGesture,
+      getHoveredYesNoKey(),
+      selectYesNoAnswer,
     );
   }
 }
@@ -1299,7 +1429,7 @@ function detectFaceForSound() {
       faceHoldToUnlockAudio
     ) {
       unlockAudio(
-        "face detected"
+        "face detected",
       );
     }
   } else {
@@ -1315,7 +1445,7 @@ function updateHandCursor() {
 
   let point =
     getHandCenterPoint(
-      hands[0]
+      hands[0],
     );
 
   if (!point) {
@@ -1326,8 +1456,10 @@ function updateHandCursor() {
   let mappedX =
     mirrorHandX
       ? W -
-        (point.x / CAM_W) * W
-      : (point.x / CAM_W) * W;
+        (point.x / CAM_W) *
+          W
+      : (point.x / CAM_W) *
+        W;
 
   let mappedY =
     (point.y / CAM_H) * H;
@@ -1335,13 +1467,13 @@ function updateHandCursor() {
   mappedX = constrain(
     mappedX,
     0,
-    W
+    W,
   );
 
   mappedY = constrain(
     mappedY,
     0,
-    H
+    H,
   );
 
   if (!handCursor.visible) {
@@ -1351,13 +1483,13 @@ function updateHandCursor() {
     handCursor.x = lerp(
       handCursor.x,
       mappedX,
-      0.35
+      0.35,
     );
 
     handCursor.y = lerp(
       handCursor.y,
       mappedY,
-      0.35
+      0.35,
     );
   }
 
@@ -1380,7 +1512,7 @@ function getHandCenterPoint(hand) {
   for (let index of indexes) {
     let point = getHandPoint(
       hand,
-      index
+      index,
     );
 
     if (point) {
@@ -1399,7 +1531,7 @@ function getHandCenterPoint(hand) {
 
   return getHandPoint(
     hand,
-    8
+    8,
   );
 }
 
@@ -1411,7 +1543,7 @@ function detectOpenCloseHandToContinue() {
 
   let handState =
     getHandOpenCloseState(
-      hands[0]
+      hands[0],
     );
 
   let now = millis();
@@ -1422,8 +1554,7 @@ function detectOpenCloseHandToContinue() {
   ) {
     if (handState === "open") {
       if (
-        openingGesture.openSince ===
-        0
+        openingGesture.openSince === 0
       ) {
         openingGesture.openSince =
           now;
@@ -1473,7 +1604,7 @@ function detectOpenCloseHandToContinue() {
         resetOpeningGesture();
 
         playScene(
-          "logoToScene01"
+          "logoToScene01",
         );
       }
     } else {
@@ -1494,7 +1625,7 @@ function resetOpeningGesture() {
 function detectChoiceSelection(
   gesture,
   hoveredKey,
-  onSelect
+  onSelect,
 ) {
   if (
     hands.length === 0 ||
@@ -1502,7 +1633,7 @@ function detectChoiceSelection(
     !hoveredKey
   ) {
     resetChoiceGesture(
-      gesture
+      gesture,
     );
 
     return;
@@ -1510,7 +1641,7 @@ function detectChoiceSelection(
 
   let handState =
     getHandOpenCloseState(
-      hands[0]
+      hands[0],
     );
 
   let now = millis();
@@ -1556,7 +1687,7 @@ function detectChoiceSelection(
       gesture.targetKey
     ) {
       resetChoiceGesture(
-        gesture
+        gesture,
       );
 
       return;
@@ -1564,8 +1695,7 @@ function detectChoiceSelection(
 
     if (handState === "closed") {
       if (
-        gesture.closedSince ===
-        0
+        gesture.closedSince === 0
       ) {
         gesture.closedSince =
           now;
@@ -1583,7 +1713,7 @@ function detectChoiceSelection(
           now;
 
         onSelect(
-          hoveredKey
+          hoveredKey,
         );
       }
     } else {
@@ -1593,7 +1723,7 @@ function detectChoiceSelection(
 }
 
 function resetChoiceGesture(
-  gesture
+  gesture,
 ) {
   gesture.phase =
     "waitingOpen";
@@ -1604,7 +1734,7 @@ function resetChoiceGesture(
 }
 
 function selectPronoun(
-  keyName
+  keyName,
 ) {
   let target =
     PRONOUN_ANSWER_VIDEOS[
@@ -1614,12 +1744,12 @@ function selectPronoun(
   if (!target) return;
 
   resetChoiceGesture(
-    pronounGesture
+    pronounGesture,
   );
 
   startCrossfade(
     "scene02Choice",
-    target
+    target,
   );
 }
 
@@ -1631,28 +1761,27 @@ function selectSeason(keyName) {
 
   if (!target) return;
 
-  // זו רק העונה שמוצגת כרגע
+  // זו העונה שמוצגת כרגע בלבד
   currentSeason = keyName;
 
-  // עדיין אין בחירה סופית
   selectedSeason = null;
   pendingSeason = null;
 
   resetChoiceGesture(
-    seasonGesture
+    seasonGesture,
   );
 
   resetChoiceGesture(
-    arrowGesture
+    arrowGesture,
   );
 
   resetChoiceGesture(
-    seasonConfirmGesture
+    seasonConfirmGesture,
   );
 
   startCrossfade(
     "scene06SeasonsChoice",
-    target
+    target,
   );
 }
 
@@ -1673,7 +1802,7 @@ function navigateSeason(direction) {
 
   let currentIndex =
     SEASON_ORDER.indexOf(
-      currentSeason
+      currentSeason,
     );
 
   if (currentIndex < 0) return;
@@ -1705,24 +1834,24 @@ function navigateSeason(direction) {
   }
 
   resetChoiceGesture(
-    arrowGesture
+    arrowGesture,
   );
 
   resetChoiceGesture(
-    seasonConfirmGesture
+    seasonConfirmGesture,
   );
 
   console.log(
     "SEASON BROWSE:",
     currentSeason,
     "->",
-    pendingSeason
+    pendingSeason,
   );
 
   startCrossfade(
     currentScene,
     fadeOutVideo,
-    seasonBrowseCrossfadeDuration
+    seasonBrowseCrossfadeDuration,
   );
 }
 
@@ -1738,29 +1867,84 @@ function confirmCurrentSeason() {
   selectedSeason =
     currentSeason;
 
-  // שומר גם ברמה הגלובלית להמשך
   window.selectedSeason =
     selectedSeason;
 
   console.log(
     "FINAL SEASON SELECTED:",
-    selectedSeason
+    selectedSeason,
   );
 
   resetChoiceGesture(
-    arrowGesture
+    arrowGesture,
   );
 
   resetChoiceGesture(
-    seasonConfirmGesture
+    seasonConfirmGesture,
   );
 
-  // מסך זמני.
-  // בהמשך נחבר כאן את המסך הבא
-  // לפי selectedSeason.
-  playScene(
-    "successScreen"
+  let targetVideo =
+    SEASON_TO_QA_VIDEOS[
+      selectedSeason
+    ];
+
+  if (!targetVideo) {
+    console.log(
+      "MISSING QA VIDEO FOR SEASON:",
+      selectedSeason,
+    );
+
+    return;
+  }
+
+  // קרוס־פייד מהלופ של העונה לסרטון המתאים
+  startCrossfade(
+    currentScene,
+    targetVideo,
+    seasonToQaCrossfadeDuration,
   );
+}
+
+function getHoveredYesNoKey() {
+  for (
+    let key of [
+      "yes",
+      "no",
+    ]
+  ) {
+    if (
+      isCursorOverChoice(
+        key,
+        YES_NO_POSITIONS,
+        yesNoBaseSize,
+        yesNoTracking,
+        "scene07YesNoChoice",
+      )
+    ) {
+      return key;
+    }
+  }
+
+  return "";
+}
+
+function selectYesNoAnswer(answerKey) {
+  selectedYesNo = answerKey;
+
+  window.selectedYesNo =
+    selectedYesNo;
+
+  console.log(
+    "YES / NO ANSWER SELECTED:",
+    selectedYesNo,
+  );
+
+  resetChoiceGesture(
+    yesNoGesture,
+  );
+
+  // נשארים כרגע במסך כדי לבדוק
+  // את המיקומים והאינטראקציה.
 }
 
 function getHoveredArrowKey() {
@@ -1839,7 +2023,7 @@ function getHoveredPronounKey() {
         PRONOUN_POSITIONS,
         pronounBaseSize,
         pronounTracking,
-        "scene02Choice"
+        "scene02Choice",
       )
     ) {
       return key;
@@ -1864,7 +2048,7 @@ function getHoveredSeasonKey() {
         SEASON_POSITIONS,
         seasonBaseSize,
         seasonTracking,
-        "scene06SeasonsChoice"
+        "scene06SeasonsChoice",
       )
     ) {
       return key;
@@ -1920,7 +2104,7 @@ function detectMouthMovementForVoiceScan() {
 
   let ratio =
     getMouthOpenRatio(
-      faces[0]
+      faces[0],
     );
 
   if (ratio === null) {
@@ -1939,12 +2123,12 @@ function detectMouthMovementForVoiceScan() {
       mouthCalibrationSamples = [];
 
       console.log(
-        "MOUTH CALIBRATION STARTED"
+        "MOUTH CALIBRATION STARTED",
       );
     }
 
     mouthCalibrationSamples.push(
-      ratio
+      ratio,
     );
 
     if (
@@ -1956,11 +2140,11 @@ function detectMouthMovementForVoiceScan() {
         mouthCalibrationSamples.reduce(
           function (
             total,
-            value
+            value,
           ) {
             return total + value;
           },
-          0
+          0,
         );
 
       mouthBaselineRatio =
@@ -1973,7 +2157,7 @@ function detectMouthMovementForVoiceScan() {
 
       console.log(
         "MOUTH CALIBRATION DONE. baseline:",
-        mouthBaselineRatio
+        mouthBaselineRatio,
       );
     }
 
@@ -1981,7 +2165,7 @@ function detectMouthMovementForVoiceScan() {
   }
 
   let movement = abs(
-    ratio - mouthPrevRatio
+    ratio - mouthPrevRatio,
   );
 
   let openAboveBaseline =
@@ -2003,13 +2187,13 @@ function detectMouthMovementForVoiceScan() {
   } else {
     mouthActivityFrames = max(
       0,
-      mouthActivityFrames - 1
+      mouthActivityFrames - 1,
     );
 
     mouthBaselineRatio = lerp(
       mouthBaselineRatio,
       ratio,
-      0.01
+      0.01,
     );
   }
 
@@ -2023,13 +2207,17 @@ function detectMouthMovementForVoiceScan() {
       "mouth ratio:",
       ratio.toFixed(4),
       "baseline:",
-      mouthBaselineRatio.toFixed(4),
+      mouthBaselineRatio.toFixed(
+        4,
+      ),
       "above:",
-      openAboveBaseline.toFixed(4),
+      openAboveBaseline.toFixed(
+        4,
+      ),
       "movement:",
       movement.toFixed(4),
       "frames:",
-      mouthActivityFrames
+      mouthActivityFrames,
     );
   }
 
@@ -2038,7 +2226,7 @@ function detectMouthMovementForVoiceScan() {
     mouthActivityFramesNeeded
   ) {
     triggerVoiceScanElement(
-      "mouth movement"
+      "mouth movement",
     );
   }
 }
@@ -2046,22 +2234,22 @@ function detectMouthMovementForVoiceScan() {
 function getMouthOpenRatio(face) {
   let upperLip = getFacePoint(
     face,
-    13
+    13,
   );
 
   let lowerLip = getFacePoint(
     face,
-    14
+    14,
   );
 
   let mouthLeft = getFacePoint(
     face,
-    61
+    61,
   );
 
   let mouthRight = getFacePoint(
     face,
-    291
+    291,
   );
 
   if (
@@ -2077,14 +2265,14 @@ function getMouthOpenRatio(face) {
     upperLip.x,
     upperLip.y,
     lowerLip.x,
-    lowerLip.y
+    lowerLip.y,
   );
 
   let mouthWidth = dist(
     mouthLeft.x,
     mouthLeft.y,
     mouthRight.x,
-    mouthRight.y
+    mouthRight.y,
   );
 
   if (mouthWidth <= 0) {
@@ -2096,7 +2284,7 @@ function getMouthOpenRatio(face) {
 
 function getFacePoint(
   face,
-  index
+  index,
 ) {
   if (
     face.keypoints &&
@@ -2119,7 +2307,7 @@ function getFacePoint(
 }
 
 function triggerVoiceScanElement(
-  reason = "unknown"
+  reason = "unknown",
 ) {
   if (
     currentScene !==
@@ -2142,7 +2330,7 @@ function triggerVoiceScanElement(
 
   console.log(
     "VOICE SCAN ELEMENT TRIGGERED BY:",
-    reason
+    reason,
   );
 
   voiceElementTriggered = true;
@@ -2157,7 +2345,7 @@ function triggerVoiceScanElement(
 
   video.el.setAttribute(
     "muted",
-    ""
+    "",
   );
 
   video.el.volume = 0;
@@ -2173,7 +2361,7 @@ function triggerVoiceScanElement(
     .catch(function (err) {
       console.log(
         "VOICE ELEMENT PLAY FAILED:",
-        err
+        err,
       );
     });
 }
@@ -2225,7 +2413,7 @@ function checkVoiceElementEnd() {
 
     startCrossfade(
       "scene05VoiceLoop",
-      "scene05ScanVoiceAns"
+      "scene05ScanVoiceAns",
     );
   }
 }
@@ -2235,11 +2423,11 @@ function checkVoiceElementEnd() {
 ----------------------------- */
 
 function getHandOpenCloseState(
-  hand
+  hand,
 ) {
   let wrist = getHandPoint(
     hand,
-    0
+    0,
   );
 
   let fingers = [
@@ -2258,12 +2446,12 @@ function getHandOpenCloseState(
   for (let pair of fingers) {
     let tip = getHandPoint(
       hand,
-      pair[0]
+      pair[0],
     );
 
     let pip = getHandPoint(
       hand,
-      pair[1]
+      pair[1],
     );
 
     if (!tip || !pip) {
@@ -2274,7 +2462,7 @@ function getHandOpenCloseState(
       isFingerExtended(
         wrist,
         tip,
-        pip
+        pip,
       )
     ) {
       extendedCount++;
@@ -2295,20 +2483,20 @@ function getHandOpenCloseState(
 function isFingerExtended(
   wrist,
   tip,
-  pip
+  pip,
 ) {
   let tipDist = dist(
     wrist.x,
     wrist.y,
     tip.x,
-    tip.y
+    tip.y,
   );
 
   let pipDist = dist(
     wrist.x,
     wrist.y,
     pip.x,
-    pip.y
+    pip.y,
   );
 
   return (
@@ -2319,7 +2507,7 @@ function isFingerExtended(
 
 function getHandPoint(
   hand,
-  index
+  index,
 ) {
   if (
     hand.keypoints &&
@@ -2356,8 +2544,7 @@ function checkAutoTransition() {
     return;
   }
 
-  // אחרי Fade Out של העונה הנוכחית,
-  // עוברים ל־Fade In של העונה הבאה
+  // אחרי Fade Out עוברים ל־Fade In של העונה הבאה
   if (
     SEASON_FADE_OUT_TO_KEY[
       currentScene
@@ -2373,7 +2560,7 @@ function checkAutoTransition() {
       checkVideoEndForCrossfade(
         currentScene,
         nextFadeIn,
-        seasonBrowseCrossfadeDuration
+        seasonBrowseCrossfadeDuration,
       );
     }
 
@@ -2391,7 +2578,7 @@ function checkAutoTransition() {
     currentScene,
     transition.to,
     transition.duration ||
-      crossfadeDuration
+      crossfadeDuration,
   );
 }
 
@@ -2399,7 +2586,7 @@ function checkVideoEndForCrossfade(
   fromSceneId,
   toSceneId,
   transitionDuration =
-    crossfadeDuration
+    crossfadeDuration,
 ) {
   let fromVideo =
     videos[fromSceneId];
@@ -2430,7 +2617,7 @@ function checkVideoEndForCrossfade(
     startCrossfade(
       fromSceneId,
       toSceneId,
-      transitionDuration
+      transitionDuration,
     );
   }
 }
@@ -2439,7 +2626,7 @@ function startCrossfade(
   fromSceneId,
   toSceneId,
   transitionDuration =
-    crossfadeDuration
+    crossfadeDuration,
 ) {
   if (isCrossfading) return;
 
@@ -2449,7 +2636,7 @@ function startCrossfade(
   ) {
     console.log(
       "Missing crossfade from scene:",
-      fromSceneId
+      fromSceneId,
     );
 
     return;
@@ -2467,23 +2654,23 @@ function startCrossfade(
   };
 
   prepareTransitionTarget(
-    toSceneId
+    toSceneId,
   );
 }
 
 function prepareTransitionTarget(
-  toSceneId
+  toSceneId,
 ) {
   if (
     isSpecialScene(toSceneId)
   ) {
     resetSceneGesture(
-      toSceneId
+      toSceneId,
     );
 
     startSpecialScene(
       toSceneId,
-      true
+      true,
     );
 
     return;
@@ -2493,13 +2680,13 @@ function prepareTransitionTarget(
     startVideo(
       toSceneId,
       true,
-      0
+      0,
     );
   }
 }
 
 function isTransitionTargetReady(
-  toSceneId
+  toSceneId,
 ) {
   if (
     toSceneId ===
@@ -2507,7 +2694,7 @@ function isTransitionTargetReady(
   ) {
     return layerVideosReady(
       "scene02Background",
-      "scene02BlobLoop"
+      "scene02BlobLoop",
     );
   }
 
@@ -2517,7 +2704,7 @@ function isTransitionTargetReady(
   ) {
     return layerVideosReady(
       "scene05ScanVoiceBackground",
-      "scene05ScanVoiceBlob"
+      "scene05ScanVoiceBlob",
     );
   }
 
@@ -2527,8 +2714,15 @@ function isTransitionTargetReady(
   ) {
     return layerVideosReady(
       "scene06SeasonsBackground",
-      "scene06SeasonsBlobLoop"
+      "scene06SeasonsBlobLoop",
     );
+  }
+
+  if (
+    toSceneId ===
+    "scene07YesNoChoice"
+  ) {
+    return !!yesNoImage;
   }
 
   if (
@@ -2550,7 +2744,7 @@ function isTransitionTargetReady(
 
 function layerVideosReady(
   firstId,
-  secondId
+  secondId,
 ) {
   return (
     videos[firstId] &&
@@ -2574,7 +2768,7 @@ function finishCrossfade() {
     activeTransition.toSceneId;
 
   stopSpecialScene(
-    fromSceneId
+    fromSceneId,
   );
 
   if (videos[fromSceneId]) {
@@ -2603,11 +2797,20 @@ function finishCrossfade() {
     }
 
     resetChoiceGesture(
-      arrowGesture
+      arrowGesture,
     );
 
     resetChoiceGesture(
-      seasonConfirmGesture
+      seasonConfirmGesture,
+    );
+  }
+
+  if (
+    currentScene ===
+    "scene07YesNoChoice"
+  ) {
+    resetChoiceGesture(
+      yesNoGesture,
     );
   }
 
@@ -2615,7 +2818,7 @@ function finishCrossfade() {
     applyAudioState(
       toSceneId,
       VIDEO_FILES[toSceneId]
-        .volume
+        .volume,
     );
   }
 
@@ -2636,7 +2839,7 @@ function drawCurrentScene() {
   drawSceneById(
     currentScene,
     1,
-    true
+    true,
   );
 }
 
@@ -2653,13 +2856,13 @@ function drawCrossfade() {
 
   if (
     !isTransitionTargetReady(
-      toSceneId
+      toSceneId,
     )
   ) {
     drawSceneById(
       fromSceneId,
       1,
-      false
+      false,
     );
 
     return;
@@ -2685,21 +2888,19 @@ function drawCrossfade() {
         1000
       ),
     0,
-    1
+    1,
   );
 
-  // הסצנה היוצאת נשארת מלאה,
-  // והיעד עולה מעליה
   drawSceneById(
     fromSceneId,
     1,
-    false
+    false,
   );
 
   drawSceneById(
     toSceneId,
     progress,
-    true
+    true,
   );
 
   if (audioUnlocked) {
@@ -2732,7 +2933,7 @@ function drawCrossfade() {
 function drawSceneById(
   sceneId,
   alpha = 1,
-  showCursor = true
+  showCursor = true,
 ) {
   if (
     sceneId ===
@@ -2743,7 +2944,7 @@ function drawSceneById(
       drawPronounTexts,
       "scene02BlobLoop",
       alpha,
-      showCursor
+      showCursor,
     );
 
     return;
@@ -2754,7 +2955,7 @@ function drawSceneById(
     "scene05VoiceLoop"
   ) {
     drawVoiceLoop(
-      alpha
+      alpha,
     );
 
     return;
@@ -2769,7 +2970,7 @@ function drawSceneById(
       drawSeasonTexts,
       "scene06SeasonsBlobLoop",
       alpha,
-      showCursor
+      showCursor,
     );
 
     return;
@@ -2781,7 +2982,19 @@ function drawSceneById(
     drawSeasonBrowseScene(
       sceneId,
       alpha,
-      showCursor
+      showCursor,
+    );
+
+    return;
+  }
+
+  if (
+    sceneId ===
+    "scene07YesNoChoice"
+  ) {
+    drawYesNoChoiceScene(
+      alpha,
+      showCursor,
     );
 
     return;
@@ -2792,7 +3005,7 @@ function drawSceneById(
     "successScreen"
   ) {
     drawSuccessScreen(
-      alpha
+      alpha,
     );
 
     return;
@@ -2800,13 +3013,13 @@ function drawSceneById(
 
   drawVideo(
     sceneId,
-    alpha
+    alpha,
   );
 }
 
 function drawVideo(
   id,
-  alpha = 1
+  alpha = 1,
 ) {
   let video = videos[id];
 
@@ -2834,7 +3047,7 @@ function drawVideo(
     0,
     0,
     W,
-    H
+    H,
   );
 
   drawingContext.restore();
@@ -2845,13 +3058,13 @@ function drawChoiceScene(
   textFunction,
   blobId,
   alpha,
-  showCursor
+  showCursor,
 ) {
   showCanvas();
 
   drawVideo(
     backgroundId,
-    alpha
+    alpha,
   );
 
   drawingContext.save();
@@ -2865,7 +3078,7 @@ function drawChoiceScene(
 
   drawVideo(
     blobId,
-    alpha
+    alpha,
   );
 
   if (showCursor) {
@@ -2881,25 +3094,25 @@ function drawChoiceScene(
 }
 
 function drawVoiceLoop(
-  alpha = 1
+  alpha = 1,
 ) {
   showCanvas();
 
   drawVideo(
     "scene05ScanVoiceBackground",
-    alpha
+    alpha,
   );
 
   if (voiceElementActive) {
     drawVideo(
       "scene05ScanVoiceElement",
-      alpha
+      alpha,
     );
   }
 
   drawVideo(
     "scene05ScanVoiceBlob",
-    alpha
+    alpha,
   );
 }
 
@@ -2916,7 +3129,7 @@ function drawPronounTexts() {
     pronounHoverScales,
     pronounTracking,
     pronounColor,
-    "scene02Choice"
+    "scene02Choice",
   );
 
   if (showPositionDots) {
@@ -2929,7 +3142,7 @@ function drawPronounTexts() {
     ) {
       drawPositionDot(
         PRONOUN_POSITIONS[key].x,
-        PRONOUN_POSITIONS[key].y
+        PRONOUN_POSITIONS[key].y,
       );
     }
   }
@@ -2949,7 +3162,7 @@ function drawSeasonTexts() {
     seasonHoverScales,
     seasonTracking,
     seasonColor,
-    "scene06SeasonsChoice"
+    "scene06SeasonsChoice",
   );
 }
 
@@ -2961,19 +3174,19 @@ function drawChoiceTexts(
   scales,
   tracking,
   colorValue,
-  sceneId
+  sceneId,
 ) {
   push();
 
   if (pronounFont) {
     textFont(
-      pronounFont
+      pronounFont,
     );
   }
 
   textAlign(
     LEFT,
-    CENTER
+    CENTER,
   );
 
   noStroke();
@@ -2982,7 +3195,7 @@ function drawChoiceTexts(
     colorValue[0],
     colorValue[1],
     colorValue[2],
-    colorValue[3]
+    colorValue[3],
   );
 
   for (let keyName of keys) {
@@ -2995,7 +3208,7 @@ function drawChoiceTexts(
         positions,
         baseSize,
         tracking,
-        sceneId
+        sceneId,
       );
 
     let targetScale =
@@ -3006,19 +3219,19 @@ function drawChoiceTexts(
     scales[keyName] = lerp(
       scales[keyName],
       targetScale,
-      0.2
+      0.2,
     );
 
     textSize(
       baseSize *
-        scales[keyName]
+        scales[keyName],
     );
 
     drawTrackedCenteredText(
       pos.label,
       pos.x,
       pos.y,
-      tracking
+      tracking,
     );
   }
 
@@ -3030,7 +3243,7 @@ function isCursorOverChoice(
   positions,
   size,
   tracking,
-  sceneId
+  sceneId,
 ) {
   if (
     !handCursor.visible ||
@@ -3048,7 +3261,7 @@ function isCursorOverChoice(
     getChoiceBounds(
       pos,
       size,
-      tracking
+      tracking,
     );
 
   let paddingX = 90;
@@ -3069,24 +3282,24 @@ function isCursorOverChoice(
 function getChoiceBounds(
   pos,
   size,
-  tracking
+  tracking,
 ) {
   push();
 
   if (pronounFont) {
     textFont(
-      pronounFont
+      pronounFont,
     );
   }
 
   textSize(
-    size
+    size,
   );
 
   let width =
     getTrackedTextWidth(
       pos.label,
-      tracking
+      tracking,
     );
 
   pop();
@@ -3110,12 +3323,12 @@ function drawTrackedCenteredText(
   textValue,
   centerX,
   centerY,
-  tracking
+  tracking,
 ) {
   let totalWidth =
     getTrackedTextWidth(
       textValue,
-      tracking
+      tracking,
     );
 
   let x =
@@ -3133,7 +3346,7 @@ function drawTrackedCenteredText(
     text(
       character,
       x,
-      centerY
+      centerY,
     );
 
     x +=
@@ -3144,7 +3357,7 @@ function drawTrackedCenteredText(
 
 function getTrackedTextWidth(
   textValue,
-  tracking
+  tracking,
 ) {
   let total = 0;
 
@@ -3155,7 +3368,7 @@ function getTrackedTextWidth(
   ) {
     total +=
       textWidth(
-        textValue.charAt(i)
+        textValue.charAt(i),
       );
 
     if (
@@ -3175,6 +3388,8 @@ function drawHandCursor() {
       "scene02Choice" ||
     currentScene ===
       "scene06SeasonsChoice" ||
+    currentScene ===
+      "scene07YesNoChoice" ||
     isSeasonLoopScene(
       currentScene
     );
@@ -3194,7 +3409,7 @@ function drawHandCursor() {
   circle(
     handCursor.x,
     handCursor.y,
-    cursorSize
+    cursorSize,
   );
 
   pop();
@@ -3203,17 +3418,15 @@ function drawHandCursor() {
 function drawSeasonBrowseScene(
   sceneId,
   alpha = 1,
-  showControls = true
+  showControls = true,
 ) {
   showCanvas();
 
   drawVideo(
     sceneId,
-    alpha
+    alpha,
   );
 
-  // החצים והמחוון מופיעים רק
-  // כשהלופ פעיל לגמרי
   if (
     showControls &&
     !isCrossfading &&
@@ -3236,18 +3449,18 @@ function drawSeasonArrows() {
 
   drawSeasonArrow(
     "prev",
-    true
+    true,
   );
 
   drawSeasonArrow(
     "next",
-    false
+    false,
   );
 }
 
 function drawSeasonArrow(
   keyName,
-  flipX
+  flipX,
 ) {
   let pos =
     ARROW_POSITIONS[
@@ -3268,9 +3481,11 @@ function drawSeasonArrow(
 
   arrowHoverScales[keyName] =
     lerp(
-      arrowHoverScales[keyName],
+      arrowHoverScales[
+        keyName
+      ],
       targetScale,
-      0.2
+      0.2,
     );
 
   push();
@@ -3279,17 +3494,19 @@ function drawSeasonArrow(
 
   translate(
     pos.x,
-    pos.y
+    pos.y,
   );
 
   let scaleAmount =
-    arrowHoverScales[keyName];
+    arrowHoverScales[
+      keyName
+    ];
 
   scale(
     flipX
       ? -scaleAmount
       : scaleAmount,
-    scaleAmount
+    scaleAmount,
   );
 
   image(
@@ -3297,14 +3514,14 @@ function drawSeasonArrow(
     0,
     0,
     arrowBaseWidth,
-    arrowBaseHeight
+    arrowBaseHeight,
   );
 
   pop();
 }
 
 function isCursorOverArrow(
-  keyName
+  keyName,
 ) {
   if (
     !handCursor.visible ||
@@ -3344,8 +3561,58 @@ function isCursorOverArrow(
   );
 }
 
+function drawYesNoChoiceScene(
+  alpha = 1,
+  showCursor = true,
+) {
+  showCanvas();
+
+  drawingContext.save();
+
+  drawingContext.globalAlpha =
+    alpha;
+
+  if (yesNoImage) {
+    imageMode(CORNER);
+
+    image(
+      yesNoImage,
+      0,
+      0,
+      W,
+      H,
+    );
+  } else {
+    background(0);
+  }
+
+  drawYesNoTexts();
+
+  if (showCursor) {
+    drawHandCursor();
+  }
+
+  drawingContext.restore();
+}
+
+function drawYesNoTexts() {
+  drawChoiceTexts(
+    [
+      "yes",
+      "no",
+    ],
+    YES_NO_POSITIONS,
+    yesNoBaseSize,
+    yesNoHoverScale,
+    yesNoHoverScales,
+    yesNoTracking,
+    yesNoColor,
+    "scene07YesNoChoice",
+  );
+}
+
 function drawSuccessScreen(
-  alpha = 1
+  alpha = 1,
 ) {
   drawingContext.save();
 
@@ -3361,11 +3628,13 @@ function drawSuccessScreen(
 
   textAlign(
     CENTER,
-    CENTER
+    CENTER,
   );
 
   if (pronounFont) {
-    textFont(pronounFont);
+    textFont(
+      pronounFont,
+    );
   }
 
   textSize(70);
@@ -3373,20 +3642,22 @@ function drawSuccessScreen(
   text(
     "Your final season is",
     W / 2,
-    H / 2 - 80
+    H / 2 - 80,
   );
 
   textSize(150);
 
   let seasonName =
     selectedSeason
-      ? SEASON_DISPLAY_NAMES[selectedSeason]
+      ? SEASON_DISPLAY_NAMES[
+          selectedSeason
+        ]
       : "No season selected";
 
   text(
     seasonName,
     W / 2,
-    H / 2 + 70
+    H / 2 + 70,
   );
 
   pop();
@@ -3396,14 +3667,14 @@ function drawSuccessScreen(
 
 function drawPositionDot(
   x,
-  y
+  y,
 ) {
   push();
 
   stroke(
     255,
     0,
-    0
+    0,
   );
 
   strokeWeight(3);
@@ -3412,14 +3683,14 @@ function drawPositionDot(
     x - 18,
     y,
     x + 18,
-    y
+    y,
   );
 
   line(
     x,
     y - 18,
     x,
-    y + 18
+    y + 18,
   );
 
   noStroke();
@@ -3427,13 +3698,13 @@ function drawPositionDot(
   fill(
     255,
     0,
-    0
+    0,
   );
 
   circle(
     x,
     y,
-    8
+    8,
   );
 
   pop();
@@ -3446,7 +3717,7 @@ function drawPositionDot(
 function fitCanvasToWindow() {
   let scaleAmount = min(
     windowWidth / W,
-    windowHeight / H
+    windowHeight / H,
   );
 
   let displayW =
@@ -3496,11 +3767,11 @@ function keyPressed() {
       "logoLoop"
   ) {
     unlockAudio(
-      "space key"
+      "space key",
     );
 
     playScene(
-      "logoToScene01"
+      "logoToScene01",
     );
   }
 
@@ -3509,7 +3780,7 @@ function keyPressed() {
     key === "D"
   ) {
     playScene(
-      "scene02Choice"
+      "scene02Choice",
     );
   }
 
@@ -3530,7 +3801,7 @@ function keyPressed() {
 
     console.log(
       "mirrorHandX:",
-      mirrorHandX
+      mirrorHandX,
     );
   }
 
@@ -3564,36 +3835,34 @@ function keyPressed() {
   ) {
     if (!audioUnlocked) {
       unlockAudio(
-        "voice scan debug key"
+        "voice scan debug key",
       );
     }
 
     triggerVoiceScanElement(
-      "debug key"
+      "debug key",
     );
   }
 
   if (key === "5") {
     playScene(
-      "scene05VoiceLoop"
+      "scene05VoiceLoop",
     );
   }
 
   if (key === "7") {
     playScene(
-      "scene05ScanVoiceAns"
+      "scene05ScanVoiceAns",
     );
   }
 
-  // מתחיל בסרטון העונות
-  // ואז עובר למסך הבחירה
   if (key === "6") {
     playScene(
-      "scene06SeasonsIntro"
+      "scene06SeasonsIntro",
     );
   }
 
-  // בדיקות בחירת עונה בלי יד
+  // בחירת עונה בלי יד
   if (
     key === "q" &&
     currentScene ===
@@ -3626,7 +3895,7 @@ function keyPressed() {
     selectSeason("autumn");
   }
 
-  // בדיקות דפדוף בלי יד
+  // דפדוף בלי יד
   if (
     keyCode === LEFT_ARROW &&
     isSeasonLoopScene(
@@ -3645,7 +3914,7 @@ function keyPressed() {
     navigateSeason("next");
   }
 
-  // אישור הבחירה בלי יד
+  // אישור העונה בלי יד
   if (
     keyCode === ENTER &&
     isSeasonLoopScene(
@@ -3654,12 +3923,40 @@ function keyPressed() {
   ) {
     confirmCurrentSeason();
   }
+
+  // מעבר ישיר למסך Yes / No
+  if (key === "8") {
+    playScene(
+      "scene07YesNoChoice",
+    );
+  }
+
+  // בדיקת Yes / No בלי יד
+  if (
+    key === "y" &&
+    currentScene ===
+      "scene07YesNoChoice"
+  ) {
+    selectYesNoAnswer(
+      "yes",
+    );
+  }
+
+  if (
+    key === "n" &&
+    currentScene ===
+      "scene07YesNoChoice"
+  ) {
+    selectYesNoAnswer(
+      "no",
+    );
+  }
 }
 
 function mousePressed() {
   if (!audioUnlocked) {
     unlockAudio(
-      "mouse click"
+      "mouse click",
     );
   }
 
@@ -3668,14 +3965,16 @@ function mousePressed() {
     "logoLoop"
   ) {
     playScene(
-      "logoToScene01"
+      "logoToScene01",
     );
   }
 }
 
 function touchStarted() {
   if (!audioUnlocked) {
-    unlockAudio("touch");
+    unlockAudio(
+      "touch",
+    );
   }
 
   if (
@@ -3683,7 +3982,7 @@ function touchStarted() {
     "logoLoop"
   ) {
     playScene(
-      "logoToScene01"
+      "logoToScene01",
     );
   }
 
