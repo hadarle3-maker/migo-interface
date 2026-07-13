@@ -1,17 +1,16 @@
-console.log("MIGO FLOW V06 - SCENE 02 TEXT POSITION TEST");
+console.log("MIGO FLOW V08 - SCENE 02 CHOICE HOVER TEST");
 
 let W = 1920;
 let H = 1080;
+
+let CAM_W = 640;
+let CAM_H = 360;
 
 let cnv;
 let videos = {};
 
 let currentScene = "logoLoop";
 let firstFrameShown = false;
-
-// תמונת בדיקה לסצנה 02
-const SCENE02_TEST_IMAGE_SRC = "assets/videos/secen02_back.png";
-let scene02TestBg;
 
 // פונט
 let pronounFont;
@@ -36,7 +35,7 @@ let faces = [];
 let faceSeenSince = 0;
 let faceHoldToUnlockAudio = 250;
 
-// מחוות יד
+// מחוות יד לפתיחה
 let gesturePhase = "waitingOpen";
 let openSince = 0;
 let closedSince = 0;
@@ -45,8 +44,30 @@ let closedHoldTime = 250;
 let lastHandGestureTime = 0;
 let gestureCooldown = 1400;
 
-// בדיקת מיקום
-let showPositionDots = true;
+// מחוון יד / hover
+let mirrorHandX = true;
+
+let handCursor = {
+  x: W / 2,
+  y: H / 2,
+  visible: false
+};
+
+let cursorSize = 20;
+
+let pronounBaseSize = 240;
+let pronounHoverScale = 2;
+let pronounTracking = -10;
+
+let pronounColor = [255, 255, 255];
+
+let hoverScales = {
+  he: 1,
+  she: 1,
+  they: 1
+};
+
+let showPositionDots = false;
 
 const VIDEO_FILES = {
   logoLoop: {
@@ -83,6 +104,24 @@ const VIDEO_FILES = {
     customLoop: false,
     startAt: 0,
     endTrim: 0.18
+  },
+
+  scene02Background: {
+    src: "assets/videos/scene_02_background_mute.mp4",
+    volume: 0,
+    loop: true,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
+  },
+
+  scene02BlobLoop: {
+    src: "assets/videos/scene_02_loop.webm",
+    volume: 0,
+    loop: true,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
   }
 };
 
@@ -111,14 +150,13 @@ function preload() {
   faceMesh = ml5.faceMesh({ maxFaces: 1 });
 
   pronounFont = loadFont("assets/fonts/TheBasics_Corporate-Light.ttf");
-  scene02TestBg = loadImage(SCENE02_TEST_IMAGE_SRC);
 }
 
 function setup() {
-  cnv = createCanvas(W, H);
-
   let d = min(window.devicePixelRatio || 1, 2);
   pixelDensity(d);
+
+  cnv = createCanvas(W, H);
 
   document.documentElement.style.margin = "0";
   document.documentElement.style.padding = "0";
@@ -250,12 +288,19 @@ function applyAudioState(id, volumeLevel = null) {
 ----------------------------- */
 
 function playScene(id) {
-  // סצנה סטטית / בדיקה
-  if (id === "scene02TextTest") {
+  if (id === "scene02Choice") {
     currentScene = id;
     isCrossfading = false;
     activeTransition = null;
+
     stopAllVideos();
+    startScene02ChoiceVideos(true);
+
+    if (!firstFrameShown) {
+      cnv.elt.style.visibility = "visible";
+      firstFrameShown = true;
+    }
+
     return;
   }
 
@@ -284,13 +329,43 @@ function playScene(id) {
   });
 }
 
+function startScene02ChoiceVideos(resetToStart) {
+  startLayerLoopVideo("scene02Background", resetToStart);
+  startLayerLoopVideo("scene02BlobLoop", resetToStart);
+}
+
+function startLayerLoopVideo(id, resetToStart) {
+  let video = videos[id];
+
+  if (!video) {
+    console.log("Missing layer video:", id);
+    return;
+  }
+
+  video.el.loop = true;
+  applyAudioState(id, 0);
+
+  if (resetToStart) {
+    try {
+      video.el.currentTime = VIDEO_FILES[id].startAt || 0;
+    } catch (e) {}
+  }
+
+  video.el.play().catch(function (err) {
+    console.log("PLAY LAYER LOOP FAILED:", id, err);
+  });
+}
+
 function stopAllVideos() {
   for (let id in videos) {
     videos[id].el.pause();
+    videos[id].el.loop = false;
 
     try {
       videos[id].el.currentTime = VIDEO_FILES[id].startAt || 0;
     } catch (e) {}
+
+    videos[id].el.volume = 0;
   }
 }
 
@@ -325,8 +400,8 @@ function checkManualLoop() {
 function setupCamera() {
   webcam = createCapture({
     video: {
-      width: 640,
-      height: 360
+      width: CAM_W,
+      height: CAM_H
     },
     audio: false
   });
@@ -351,6 +426,7 @@ function gotFaces(results) {
 
 function updateInteraction() {
   detectFaceForSound();
+  updateHandCursor();
 
   if (currentScene === "logoLoop" && !isCrossfading) {
     detectOpenCloseHandToContinue();
@@ -371,6 +447,70 @@ function detectFaceForSound() {
   } else {
     faceSeenSince = 0;
   }
+}
+
+function updateHandCursor() {
+  if (hands.length === 0) {
+    handCursor.visible = false;
+    return;
+  }
+
+  let hand = hands[0];
+  let p = getHandCenterPoint(hand);
+
+  if (!p) {
+    handCursor.visible = false;
+    return;
+  }
+
+  let mappedX;
+
+  if (mirrorHandX) {
+    mappedX = W - (p.x / CAM_W) * W;
+  } else {
+    mappedX = (p.x / CAM_W) * W;
+  }
+
+  let mappedY = (p.y / CAM_H) * H;
+
+  mappedX = constrain(mappedX, 0, W);
+  mappedY = constrain(mappedY, 0, H);
+
+  if (!handCursor.visible) {
+    handCursor.x = mappedX;
+    handCursor.y = mappedY;
+  } else {
+    handCursor.x = lerp(handCursor.x, mappedX, 0.35);
+    handCursor.y = lerp(handCursor.y, mappedY, 0.35);
+  }
+
+  handCursor.visible = true;
+}
+
+function getHandCenterPoint(hand) {
+  let indexes = [0, 5, 9, 13, 17];
+  let sumX = 0;
+  let sumY = 0;
+  let count = 0;
+
+  for (let i = 0; i < indexes.length; i++) {
+    let p = getHandPoint(hand, indexes[i]);
+
+    if (p) {
+      sumX += p.x;
+      sumY += p.y;
+      count++;
+    }
+  }
+
+  if (count > 0) {
+    return {
+      x: sumX / count,
+      y: sumY / count
+    };
+  }
+
+  return getHandPoint(hand, 8);
 }
 
 function detectOpenCloseHandToContinue() {
@@ -500,7 +640,7 @@ function checkAutoTransition() {
   }
 
   if (currentScene === "scene02Intro") {
-    checkVideoEndForCrossfade("scene02Intro", "scene02TextTest");
+    checkVideoEndForCrossfade("scene02Intro", "scene02Choice");
   }
 }
 
@@ -534,10 +674,15 @@ function startCrossfade(fromVideoId, toSceneId) {
   activeTransition = {
     fromVideoId: fromVideoId,
     toSceneId: toSceneId,
-    fadeStartTime: millis()
+    fadeStarted: false,
+    fadeStartTime: 0
   };
 
-  // אם היעד הוא וידאו — מתחילים אותו לפני הפייד
+  if (toSceneId === "scene02Choice") {
+    startScene02ChoiceVideos(true);
+    return;
+  }
+
   if (videos[toSceneId]) {
     let toVideo = videos[toSceneId];
 
@@ -554,6 +699,23 @@ function startCrossfade(fromVideoId, toSceneId) {
   }
 }
 
+function isTransitionTargetReady(toSceneId) {
+  if (toSceneId === "scene02Choice") {
+    return (
+      videos.scene02Background &&
+      videos.scene02BlobLoop &&
+      videos.scene02Background.el.readyState > 0 &&
+      videos.scene02BlobLoop.el.readyState > 0
+    );
+  }
+
+  if (videos[toSceneId]) {
+    return videos[toSceneId].el.readyState > 0;
+  }
+
+  return true;
+}
+
 function finishCrossfade() {
   if (!activeTransition) return;
 
@@ -566,6 +728,10 @@ function finishCrossfade() {
   }
 
   currentScene = toSceneId;
+
+  if (toSceneId === "scene02Choice") {
+    startScene02ChoiceVideos(false);
+  }
 
   if (videos[toSceneId]) {
     applyAudioState(toSceneId, VIDEO_FILES[toSceneId].volume);
@@ -585,8 +751,8 @@ function drawCurrentScene() {
     return;
   }
 
-  if (currentScene === "scene02TextTest") {
-    drawScene02TextTest(1);
+  if (currentScene === "scene02Choice") {
+    drawScene02Choice(1);
     return;
   }
 
@@ -603,13 +769,14 @@ function drawCrossfade() {
 
   if (!fromVideo) return;
 
-  if (videos[toSceneId]) {
-    let toVideo = videos[toSceneId];
+  if (!isTransitionTargetReady(toSceneId)) {
+    drawVideo(fromVideoId, 1);
+    return;
+  }
 
-    if (toVideo.el.readyState < 2) {
-      drawVideo(fromVideoId, 1);
-      return;
-    }
+  if (!activeTransition.fadeStarted) {
+    activeTransition.fadeStarted = true;
+    activeTransition.fadeStartTime = millis();
   }
 
   let p =
@@ -618,19 +785,20 @@ function drawCrossfade() {
 
   p = constrain(p, 0, 1);
 
-  // בלי נפילה לשחור:
-  // הסרטון היוצא נשאר 100%, היעד עולה מעליו.
   drawVideo(fromVideoId, 1);
 
-  if (toSceneId === "scene02TextTest") {
-    drawScene02TextTest(p);
+  if (toSceneId === "scene02Choice") {
+    drawScene02Choice(p);
   } else {
     drawVideo(toSceneId, p);
   }
 
-  if (audioUnlocked && videos[toSceneId]) {
+  if (audioUnlocked) {
     fromVideo.el.volume = VIDEO_FILES[fromVideoId].volume * (1 - p);
-    videos[toSceneId].el.volume = VIDEO_FILES[toSceneId].volume * p;
+
+    if (videos[toSceneId]) {
+      videos[toSceneId].el.volume = VIDEO_FILES[toSceneId].volume * p;
+    }
   }
 
   if (p >= 1) {
@@ -656,17 +824,19 @@ function drawVideo(id, alpha = 1) {
   }
 }
 
-function drawScene02TextTest(alpha = 1) {
+function drawScene02Choice(alpha = 1) {
+  if (!firstFrameShown) {
+    cnv.elt.style.visibility = "visible";
+    firstFrameShown = true;
+  }
+
   drawingContext.save();
   drawingContext.globalAlpha = alpha;
 
-  if (scene02TestBg) {
-    image(scene02TestBg, 0, 0, W, H);
-  } else {
-    background(0);
-  }
-
+  drawVideo("scene02Background", 1);
   drawPronounTexts();
+  drawVideo("scene02BlobLoop", 1);
+  drawHandCursor();
 
   drawingContext.restore();
 }
@@ -674,32 +844,16 @@ function drawScene02TextTest(alpha = 1) {
 function drawPronounTexts() {
   push();
 
-  textFont(pronounFont);
-  textSize(240);
+  if (pronounFont) {
+    textFont(pronounFont);
+  }
+
   textAlign(LEFT, CENTER);
   noStroke();
-  fill(255, 0, 0);
 
-  drawTrackedCenteredText(
-    PRONOUN_POSITIONS.he.label,
-    PRONOUN_POSITIONS.he.x,
-    PRONOUN_POSITIONS.he.y,
-    -10
-  );
-
-  drawTrackedCenteredText(
-    PRONOUN_POSITIONS.she.label,
-    PRONOUN_POSITIONS.she.x,
-    PRONOUN_POSITIONS.she.y,
-    -10
-  );
-
-  drawTrackedCenteredText(
-    PRONOUN_POSITIONS.they.label,
-    PRONOUN_POSITIONS.they.x,
-    PRONOUN_POSITIONS.they.y,
-    -10
-  );
+  drawPronounWord("he");
+  drawPronounWord("she");
+  drawPronounWord("they");
 
   if (showPositionDots) {
     drawPositionDot(PRONOUN_POSITIONS.he.x, PRONOUN_POSITIONS.he.y);
@@ -708,6 +862,74 @@ function drawPronounTexts() {
   }
 
   pop();
+}
+
+function drawPronounWord(keyName) {
+  let pos = PRONOUN_POSITIONS[keyName];
+
+  if (!pos) return;
+
+  let hovering = isCursorOverPronoun(keyName);
+  let targetScale = hovering ? pronounHoverScale : 1;
+
+  hoverScales[keyName] = lerp(hoverScales[keyName], targetScale, 0.2);
+
+  let currentSize = pronounBaseSize * hoverScales[keyName];
+
+  textSize(currentSize);
+  fill(pronounColor[0], pronounColor[1], pronounColor[2]);
+
+  drawTrackedCenteredText(
+    pos.label,
+    pos.x,
+    pos.y,
+    pronounTracking
+  );
+}
+
+function isCursorOverPronoun(keyName) {
+  if (!handCursor.visible) return false;
+  if (currentScene !== "scene02Choice") return false;
+
+  let pos = PRONOUN_POSITIONS[keyName];
+
+  if (!pos) return false;
+
+  let bounds = getPronounBounds(keyName, pronounBaseSize, pronounTracking);
+
+  let paddingX = 90;
+  let paddingY = 80;
+
+  return (
+    handCursor.x >= bounds.left - paddingX &&
+    handCursor.x <= bounds.right + paddingX &&
+    handCursor.y >= bounds.top - paddingY &&
+    handCursor.y <= bounds.bottom + paddingY
+  );
+}
+
+function getPronounBounds(keyName, size, tracking) {
+  let pos = PRONOUN_POSITIONS[keyName];
+
+  push();
+
+  if (pronounFont) {
+    textFont(pronounFont);
+  }
+
+  textSize(size);
+
+  let w = getTrackedTextWidth(pos.label, tracking);
+  let h = size;
+
+  pop();
+
+  return {
+    left: pos.x - w / 2,
+    right: pos.x + w / 2,
+    top: pos.y - h / 2,
+    bottom: pos.y + h / 2
+  };
 }
 
 function drawTrackedCenteredText(txt, centerX, centerY, tracking) {
@@ -733,6 +955,17 @@ function getTrackedTextWidth(txt, tracking) {
   }
 
   return total;
+}
+
+function drawHandCursor() {
+  if (currentScene !== "scene02Choice") return;
+  if (!handCursor.visible) return;
+
+  push();
+  noStroke();
+  fill(255);
+  circle(handCursor.x, handCursor.y, cursorSize);
+  pop();
 }
 
 function drawPositionDot(x, y) {
@@ -777,14 +1010,20 @@ function keyPressed() {
     playScene("logoToScene01");
   }
 
-  // קיצור לבדיקה: D מדלג ישר למסך בדיקת מיקומים
+  // D מדלג ישר למסך הבחירה
   if (key === "d" || key === "D") {
-    playScene("scene02TextTest");
+    playScene("scene02Choice");
   }
 
-  // קיצור לבדיקה: S מדליק/מכבה נקודות עוגן
+  // S מדליק/מכבה נקודות עוגן
   if (key === "s" || key === "S") {
     showPositionDots = !showPositionDots;
+  }
+
+  // M הופך את כיוון היד אם המחוון זז הפוך
+  if (key === "m" || key === "M") {
+    mirrorHandX = !mirrorHandX;
+    console.log("mirrorHandX:", mirrorHandX);
   }
 }
 
