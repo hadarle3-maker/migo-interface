@@ -1,49 +1,34 @@
-console.log("MIGO FLOW V21 - SEASONS INTRO TO STATIC CHOICE");
+console.log("MIGO FLOW V22 - INTERACTIVE SEASONS CHOICE");
 
-let W = 1920;
-let H = 1080;
-
-let CAM_W = 640;
-let CAM_H = 360;
+const W = 1920;
+const H = 1080;
+const CAM_W = 640;
+const CAM_H = 360;
 
 let cnv;
 let videos = {};
+let webcam;
+let handPose;
+let hands = [];
+let faceMesh;
+let faces = [];
+let pronounFont;
 
-// סאונד חיצוני ל־Voice Scan
+let currentScene = "logoLoop";
+let firstFrameShown = false;
+let audioUnlocked = false;
+
 let voiceScanSound;
 const VOICE_SCAN_SOUND_SRC = "assets/sound/sound_scan.mp3";
 const VOICE_SCAN_SOUND_VOLUME = 0.15;
 
-let currentScene = "logoLoop";
-let firstFrameShown = false;
-
-// פונט
-let pronounFont;
-
-// תמונת רקע זמנית למסך העונות
-let seasonsImage;
-
-// סאונד כללי
-let audioUnlocked = false;
-
-// מעבר
 let isCrossfading = false;
 let crossfadeDuration = 0.65;
 let activeTransition = null;
 
-// מצלמה / ידיים / פנים
-let webcam;
-
-let handPose;
-let hands = [];
-
-let faceMesh;
-let faces = [];
-
 let faceSeenSince = 0;
 let faceHoldToUnlockAudio = 250;
 
-// מחוות יד לפתיחה
 let gesturePhase = "waitingOpen";
 let openSince = 0;
 let closedSince = 0;
@@ -52,15 +37,24 @@ let closedHoldTime = 250;
 let lastHandGestureTime = 0;
 let gestureCooldown = 1400;
 
-// מחוות יד לבחירת He / She / They
-let choiceGesturePhase = "waitingOpen";
-let choiceOpenSince = 0;
-let choiceClosedSince = 0;
-let choiceTargetKey = "";
-let lastChoiceGestureTime = 0;
-let choiceGestureCooldown = 1400;
+let pronounChoiceGesture = {
+  phase: "waitingOpen",
+  openSince: 0,
+  closedSince: 0,
+  targetKey: "",
+  lastGestureTime: 0,
+  cooldown: 1400,
+};
 
-// מחוון יד / hover
+let seasonChoiceGesture = {
+  phase: "waitingOpen",
+  openSince: 0,
+  closedSince: 0,
+  targetKey: "",
+  lastGestureTime: 0,
+  cooldown: 1400,
+};
+
 let mirrorHandX = true;
 
 let handCursor = {
@@ -69,10 +63,9 @@ let handCursor = {
   visible: false,
 };
 
-// גודל מחוון יד
 let cursorSize = 40;
+let showPositionDots = false;
 
-// טקסטים
 let pronounBaseSize = 240;
 let pronounHoverScale = 1.3;
 let pronounTracking = -10;
@@ -80,43 +73,45 @@ let pronounTracking = -10;
 // #A8A1E1 באופסיטי 28%
 let pronounColor = [168, 161, 225, 71];
 
-let hoverScales = {
+let pronounHoverScales = {
   he: 1,
   she: 1,
   they: 1,
 };
 
-// טקסטים זמניים למסך בחירת עונה
 let seasonBaseSize = 180;
+let seasonHoverScale = 1.3;
 let seasonTracking = -10;
-let seasonColor = [255, 0, 0, 255];
 
-let showPositionDots = false;
+// בדיוק אותו צבע ואותו אופסיטי כמו He / She / They
+let seasonColor = [168, 161, 225, 71];
 
-// זיהוי תנועת פה ל־Voice Scan
+let seasonHoverScales = {
+  summer: 1,
+  winter: 1,
+  spring: 1,
+  autumn: 1,
+};
+
 let voiceLoopEnteredAt = 0;
 let voiceElementTriggered = false;
 let voiceElementPlaying = false;
 let voiceElementActive = false;
 
-// דיליי קטן בין אלמנט הסריקה לבין סרטון התשובה
 let voiceAnsDelayActive = false;
 let voiceAnsDelayStartedAt = 0;
 let voiceAnsDelayMs = 650;
 
-// זיהוי פה
 let mouthPrevRatio = null;
 let mouthBaselineRatio = null;
 let mouthActivityFrames = 0;
 let mouthDebugCounter = 0;
 
-// כיול שקט לפני זיהוי דיבור
 let mouthCalibrationStartedAt = 0;
 let mouthCalibrationDuration = 1600;
 let mouthCalibrationSamples = [];
 let mouthCalibrationDone = false;
 
-// רגישות זיהוי פה — גרסה שלא אמורה לקפוץ לבד
 let mouthMovementDeltaThreshold = 0.006;
 let mouthOpenAboveBaselineThreshold = 0.018;
 let mouthActivityFramesNeeded = 7;
@@ -284,6 +279,96 @@ const VIDEO_FILES = {
     startAt: 0,
     endTrim: 0.18,
   },
+
+  scene06SeasonsBackground: {
+    src: "assets/videos/scene_06_seasons_background.mp4",
+    volume: 0,
+    loop: true,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene06SeasonsBlobLoop: {
+    src: "assets/videos/scene_06_seasons_loop.webm",
+    volume: 0,
+    loop: true,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene06SummerIn: {
+    src: "assets/videos/scene_06_seasons_summer_in.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0.18,
+  },
+
+  scene06SummerLoop: {
+    src: "assets/videos/secen_06_Seasons_summer_loop.mp4",
+    volume: 1,
+    loop: true,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene06WinterIn: {
+    src: "assets/videos/scene_06_seasons_winter_in.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0.18,
+  },
+
+  scene06WinterLoop: {
+    src: "assets/videos/secen_06_Seasons_winter_loop.mp4",
+    volume: 1,
+    loop: true,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene06SpringIn: {
+    src: "assets/videos/scene_06_seasons_spring_in.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0.18,
+  },
+
+  scene06SpringLoop: {
+    src: "assets/videos/secen_06_Seasons_spring_loop.mp4",
+    volume: 1,
+    loop: true,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene06AutumnIn: {
+    src: "assets/videos/scene_06_seasons_autumn_in.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0.18,
+  },
+
+  scene06AutumnLoop: {
+    src: "assets/videos/secen_06_Seasons_Autumn_loop.mp4",
+    volume: 1,
+    loop: true,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0,
+  },
 };
 
 const PRONOUN_POSITIONS = {
@@ -338,18 +423,58 @@ const PRONOUN_ANSWER_VIDEOS = {
   they: "scene02AnsThey",
 };
 
+const SEASON_IN_VIDEOS = {
+  summer: "scene06SummerIn",
+  winter: "scene06WinterIn",
+  spring: "scene06SpringIn",
+  autumn: "scene06AutumnIn",
+};
+
+const AUTO_VIDEO_TRANSITIONS = {
+  logoToScene01: "scene01",
+  scene01: "scene02Intro",
+  scene02Intro: "scene02Choice",
+
+  scene02AnsShe: "scene03SheToLoveFace",
+  scene02AnsHe: "scene03HeToLoveFace",
+  scene02AnsThey: "scene03TheyToLoveFace",
+
+  scene03SheToLoveFace: "scene05ScanVoiceOnly",
+  scene03HeToLoveFace: "scene05ScanVoiceOnly",
+  scene03TheyToLoveFace: "scene05ScanVoiceOnly",
+
+  scene05ScanVoiceOnly: "scene05VoiceLoop",
+  scene05ScanVoiceAns: "scene06SeasonsIntro",
+
+  scene06SeasonsIntro: "scene06SeasonsChoice",
+
+  scene06SummerIn: "scene06SummerLoop",
+  scene06WinterIn: "scene06WinterLoop",
+  scene06SpringIn: "scene06SpringLoop",
+  scene06AutumnIn: "scene06AutumnLoop",
+};
+
 function preload() {
-  handPose = ml5.handPose({ maxHands: 1 });
-  faceMesh = ml5.faceMesh({ maxFaces: 1 });
+  handPose = ml5.handPose({
+    maxHands: 1,
+  });
 
-  pronounFont = loadFont("assets/fonts/TheBasics_Corporate-Light.ttf");
+  faceMesh = ml5.faceMesh({
+    maxFaces: 1,
+  });
 
-  seasonsImage = loadImage("assets/videos/Seasons.png");
+  pronounFont = loadFont(
+    "assets/fonts/TheBasics_Corporate-Light.ttf",
+  );
 }
 
 function setup() {
-  let d = min(window.devicePixelRatio || 1, 2);
-  pixelDensity(d);
+  pixelDensity(
+    min(
+      window.devicePixelRatio || 1,
+      2,
+    ),
+  );
 
   cnv = createCanvas(W, H);
 
@@ -365,7 +490,6 @@ function setup() {
   cnv.elt.style.visibility = "hidden";
 
   fitCanvasToWindow();
-
   loadVideos();
   loadSounds();
   setupCamera();
@@ -391,7 +515,10 @@ function draw() {
 
 function loadVideos() {
   for (let id in VIDEO_FILES) {
-    videos[id] = createVideoElement(id, VIDEO_FILES[id].src);
+    videos[id] = createVideoElement(
+      id,
+      VIDEO_FILES[id].src,
+    );
   }
 }
 
@@ -407,19 +534,43 @@ function createVideoElement(id, src) {
 
   el.setAttribute("muted", "");
   el.setAttribute("playsinline", "");
-  el.setAttribute("webkit-playsinline", "");
+  el.setAttribute(
+    "webkit-playsinline",
+    "",
+  );
 
-  el.addEventListener("loadeddata", function () {
-    console.log("VIDEO LOADED:", id, src);
-  });
+  el.addEventListener(
+    "loadeddata",
+    function () {
+      console.log(
+        "VIDEO LOADED:",
+        id,
+        src,
+      );
+    },
+  );
 
-  el.addEventListener("canplay", function () {
-    console.log("VIDEO CAN PLAY:", id);
-  });
+  el.addEventListener(
+    "canplay",
+    function () {
+      console.log(
+        "VIDEO CAN PLAY:",
+        id,
+      );
+    },
+  );
 
-  el.addEventListener("error", function () {
-    console.log("VIDEO ERROR:", id, src, el.error);
-  });
+  el.addEventListener(
+    "error",
+    function () {
+      console.log(
+        "VIDEO ERROR:",
+        id,
+        src,
+        el.error,
+      );
+    },
+  );
 
   el.load();
 
@@ -435,20 +586,38 @@ function createVideoElement(id, src) {
 ----------------------------- */
 
 function loadSounds() {
-  voiceScanSound = document.createElement("audio");
+  voiceScanSound =
+    document.createElement("audio");
 
-  voiceScanSound.src = VOICE_SCAN_SOUND_SRC;
+  voiceScanSound.src =
+    VOICE_SCAN_SOUND_SRC;
+
   voiceScanSound.preload = "auto";
-  voiceScanSound.volume = VOICE_SCAN_SOUND_VOLUME;
+  voiceScanSound.volume =
+    VOICE_SCAN_SOUND_VOLUME;
+
   voiceScanSound.muted = true;
 
-  voiceScanSound.addEventListener("canplaythrough", function () {
-    console.log("VOICE SCAN SOUND READY:", VOICE_SCAN_SOUND_SRC);
-  });
+  voiceScanSound.addEventListener(
+    "canplaythrough",
+    function () {
+      console.log(
+        "VOICE SCAN SOUND READY:",
+        VOICE_SCAN_SOUND_SRC,
+      );
+    },
+  );
 
-  voiceScanSound.addEventListener("error", function () {
-    console.log("VOICE SCAN SOUND ERROR:", VOICE_SCAN_SOUND_SRC, voiceScanSound.error);
-  });
+  voiceScanSound.addEventListener(
+    "error",
+    function () {
+      console.log(
+        "VOICE SCAN SOUND ERROR:",
+        VOICE_SCAN_SOUND_SRC,
+        voiceScanSound.error,
+      );
+    },
+  );
 
   voiceScanSound.load();
 }
@@ -457,12 +626,17 @@ function loadSounds() {
    AUDIO
 ----------------------------- */
 
-function unlockAudio(reason = "unknown") {
+function unlockAudio(
+  reason = "unknown",
+) {
   if (audioUnlocked) return;
 
   audioUnlocked = true;
 
-  console.log("AUDIO UNLOCKED BY:", reason);
+  console.log(
+    "AUDIO UNLOCKED BY:",
+    reason,
+  );
 
   for (let id in videos) {
     let video = videos[id];
@@ -471,7 +645,8 @@ function unlockAudio(reason = "unknown") {
     video.el.removeAttribute("muted");
 
     if (id === currentScene) {
-      video.el.volume = VIDEO_FILES[id].volume;
+      video.el.volume =
+        VIDEO_FILES[id].volume;
     } else {
       video.el.volume = 0;
     }
@@ -479,17 +654,27 @@ function unlockAudio(reason = "unknown") {
 
   if (voiceScanSound) {
     voiceScanSound.muted = false;
-    voiceScanSound.volume = VOICE_SCAN_SOUND_VOLUME;
+    voiceScanSound.volume =
+      VOICE_SCAN_SOUND_VOLUME;
   }
 
   if (videos[currentScene]) {
-    videos[currentScene].el.play().catch(function (err) {
-      console.log("PLAY AFTER AUDIO UNLOCK FAILED:", currentScene, err);
-    });
+    videos[currentScene].el
+      .play()
+      .catch(function (err) {
+        console.log(
+          "PLAY AFTER AUDIO UNLOCK FAILED:",
+          currentScene,
+          err,
+        );
+      });
   }
 }
 
-function applyAudioState(id, volumeLevel = null) {
+function applyAudioState(
+  id,
+  volumeLevel = null,
+) {
   let video = videos[id];
 
   if (!video) return;
@@ -499,9 +684,11 @@ function applyAudioState(id, volumeLevel = null) {
     video.el.removeAttribute("muted");
 
     if (volumeLevel !== null) {
-      video.el.volume = volumeLevel;
+      video.el.volume =
+        volumeLevel;
     } else {
-      video.el.volume = VIDEO_FILES[id].volume;
+      video.el.volume =
+        VIDEO_FILES[id].volume;
     }
   } else {
     video.el.muted = true;
@@ -515,13 +702,21 @@ function playVoiceScanSound() {
   try {
     voiceScanSound.pause();
     voiceScanSound.currentTime = 0;
-    voiceScanSound.volume = VOICE_SCAN_SOUND_VOLUME;
-    voiceScanSound.muted = !audioUnlocked;
+    voiceScanSound.volume =
+      VOICE_SCAN_SOUND_VOLUME;
+
+    voiceScanSound.muted =
+      !audioUnlocked;
   } catch (e) {}
 
-  voiceScanSound.play().catch(function (err) {
-    console.log("VOICE SCAN SOUND PLAY FAILED:", err);
-  });
+  voiceScanSound
+    .play()
+    .catch(function (err) {
+      console.log(
+        "VOICE SCAN SOUND PLAY FAILED:",
+        err,
+      );
+    });
 }
 
 function stopVoiceScanSound() {
@@ -538,80 +733,6 @@ function stopVoiceScanSound() {
 ----------------------------- */
 
 function playScene(id) {
-  if (id === "scene02Choice") {
-    currentScene = id;
-    isCrossfading = false;
-    activeTransition = null;
-
-    resetChoiceGesture();
-    stopAllVideos();
-    stopVoiceScanSound();
-    startScene02ChoiceVideos(true);
-
-    if (!firstFrameShown) {
-      cnv.elt.style.visibility = "visible";
-      firstFrameShown = true;
-    }
-
-    return;
-  }
-
-  if (id === "scene05VoiceLoop") {
-    currentScene = id;
-    isCrossfading = false;
-    activeTransition = null;
-
-    stopAllVideos();
-    stopVoiceScanSound();
-    startScene05VoiceLoopVideos(true);
-
-    if (!firstFrameShown) {
-      cnv.elt.style.visibility = "visible";
-      firstFrameShown = true;
-    }
-
-    return;
-  }
-
-  if (id === "scene06SeasonsChoice") {
-    currentScene = id;
-    isCrossfading = false;
-    activeTransition = null;
-
-    stopAllVideos();
-    stopVoiceScanSound();
-
-    if (!firstFrameShown) {
-      cnv.elt.style.visibility = "visible";
-      firstFrameShown = true;
-    }
-
-    return;
-  }
-
-  if (id === "successScreen") {
-    currentScene = id;
-    isCrossfading = false;
-    activeTransition = null;
-
-    stopAllVideos();
-    stopVoiceScanSound();
-
-    if (!firstFrameShown) {
-      cnv.elt.style.visibility = "visible";
-      firstFrameShown = true;
-    }
-
-    return;
-  }
-
-  let video = videos[id];
-
-  if (!video) {
-    console.log("Missing video:", id);
-    return;
-  }
-
   currentScene = id;
   isCrossfading = false;
   activeTransition = null;
@@ -619,34 +740,131 @@ function playScene(id) {
   stopAllVideos();
   stopVoiceScanSound();
 
-  video.el.loop = false;
+  if (id === "scene02Choice") {
+    resetChoiceGesture(
+      pronounChoiceGesture,
+    );
+
+    startScene02ChoiceVideos(
+      true,
+    );
+
+    showCanvas();
+    return;
+  }
+
+  if (id === "scene05VoiceLoop") {
+    startScene05VoiceLoopVideos(
+      true,
+    );
+
+    showCanvas();
+    return;
+  }
+
+  if (
+    id === "scene06SeasonsChoice"
+  ) {
+    resetChoiceGesture(
+      seasonChoiceGesture,
+    );
+
+    startScene06SeasonsChoiceVideos(
+      true,
+    );
+
+    showCanvas();
+    return;
+  }
+
+  if (id === "successScreen") {
+    showCanvas();
+    return;
+  }
+
+  let video = videos[id];
+
+  if (!video) {
+    console.log(
+      "Missing video:",
+      id,
+    );
+
+    return;
+  }
+
+  video.el.loop =
+    VIDEO_FILES[id].loop || false;
+
   applyAudioState(id);
 
   try {
-    video.el.currentTime = VIDEO_FILES[id].startAt || 0;
+    video.el.currentTime =
+      VIDEO_FILES[id].startAt || 0;
   } catch (e) {}
 
-  video.el.play().catch(function (err) {
-    console.log("PLAY FAILED:", id, err);
-  });
+  video.el
+    .play()
+    .catch(function (err) {
+      console.log(
+        "PLAY FAILED:",
+        id,
+        err,
+      );
+    });
 }
 
-function startScene02ChoiceVideos(resetToStart) {
-  startLayerLoopVideo("scene02Background", resetToStart);
-  startLayerLoopVideo("scene02BlobLoop", resetToStart);
+function showCanvas() {
+  if (!firstFrameShown) {
+    cnv.elt.style.visibility =
+      "visible";
+
+    firstFrameShown = true;
+  }
+}
+
+function startScene02ChoiceVideos(
+  resetToStart,
+) {
+  startLayerLoopVideo(
+    "scene02Background",
+    resetToStart,
+  );
+
+  startLayerLoopVideo(
+    "scene02BlobLoop",
+    resetToStart,
+  );
 }
 
 function stopScene02ChoiceVideos() {
-  stopSingleVideo("scene02Background");
-  stopSingleVideo("scene02BlobLoop");
+  stopSingleVideo(
+    "scene02Background",
+  );
+
+  stopSingleVideo(
+    "scene02BlobLoop",
+  );
 }
 
-function startScene05VoiceLoopVideos(resetToStart) {
-  startLayerLoopVideo("scene05ScanVoiceBackground", resetToStart);
-  startLayerLoopVideo("scene05ScanVoiceBlob", resetToStart);
+function startScene05VoiceLoopVideos(
+  resetToStart,
+) {
+  startLayerLoopVideo(
+    "scene05ScanVoiceBackground",
+    resetToStart,
+  );
+
+  startLayerLoopVideo(
+    "scene05ScanVoiceBlob",
+    resetToStart,
+  );
 
   if (resetToStart) {
-    stopSingleVideo("scene05ScanVoiceElement");
+    stopSingleVideo(
+      "scene05ScanVoiceElement",
+    );
+
     resetVoiceScanState();
   }
 
@@ -654,12 +872,44 @@ function startScene05VoiceLoopVideos(resetToStart) {
 }
 
 function stopScene05VoiceLoopVideos() {
-  stopSingleVideo("scene05ScanVoiceBackground");
-  stopSingleVideo("scene05ScanVoiceElement");
-  stopSingleVideo("scene05ScanVoiceBlob");
+  stopSingleVideo(
+    "scene05ScanVoiceBackground",
+  );
+
+  stopSingleVideo(
+    "scene05ScanVoiceElement",
+  );
+
+  stopSingleVideo(
+    "scene05ScanVoiceBlob",
+  );
 
   stopVoiceScanSound();
   resetVoiceScanState();
+}
+
+function startScene06SeasonsChoiceVideos(
+  resetToStart,
+) {
+  startLayerLoopVideo(
+    "scene06SeasonsBackground",
+    resetToStart,
+  );
+
+  startLayerLoopVideo(
+    "scene06SeasonsBlobLoop",
+    resetToStart,
+  );
+}
+
+function stopScene06SeasonsChoiceVideos() {
+  stopSingleVideo(
+    "scene06SeasonsBackground",
+  );
+
+  stopSingleVideo(
+    "scene06SeasonsBlobLoop",
+  );
 }
 
 function stopSingleVideo(id) {
@@ -670,15 +920,23 @@ function stopSingleVideo(id) {
   videos[id].el.volume = 0;
 
   try {
-    videos[id].el.currentTime = VIDEO_FILES[id].startAt || 0;
+    videos[id].el.currentTime =
+      VIDEO_FILES[id].startAt || 0;
   } catch (e) {}
 }
 
-function startLayerLoopVideo(id, resetToStart) {
+function startLayerLoopVideo(
+  id,
+  resetToStart,
+) {
   let video = videos[id];
 
   if (!video) {
-    console.log("Missing layer video:", id);
+    console.log(
+      "Missing layer video:",
+      id,
+    );
+
     return;
   }
 
@@ -687,49 +945,75 @@ function startLayerLoopVideo(id, resetToStart) {
 
   if (resetToStart) {
     try {
-      video.el.currentTime = VIDEO_FILES[id].startAt || 0;
+      video.el.currentTime =
+        VIDEO_FILES[id].startAt ||
+        0;
     } catch (e) {}
   }
 
-  video.el.play().catch(function (err) {
-    console.log("PLAY LAYER LOOP FAILED:", id, err);
-  });
+  video.el
+    .play()
+    .catch(function (err) {
+      console.log(
+        "PLAY LAYER LOOP FAILED:",
+        id,
+        err,
+      );
+    });
 }
 
 function stopAllVideos() {
   for (let id in videos) {
     videos[id].el.pause();
     videos[id].el.loop = false;
+    videos[id].el.volume = 0;
 
     try {
-      videos[id].el.currentTime = VIDEO_FILES[id].startAt || 0;
+      videos[id].el.currentTime =
+        VIDEO_FILES[id].startAt ||
+        0;
     } catch (e) {}
-
-    videos[id].el.volume = 0;
   }
 }
 
 function checkManualLoop() {
-  let def = VIDEO_FILES[currentScene];
+  let def =
+    VIDEO_FILES[currentScene];
 
-  if (!def || !def.customLoop) return;
+  if (
+    !def ||
+    !def.customLoop ||
+    !videos[currentScene]
+  ) {
+    return;
+  }
 
-  let video = videos[currentScene].el;
+  let video =
+    videos[currentScene].el;
 
   if (!video.duration) return;
 
-  let loopStart = def.startAt || 0;
-  let endTrim = def.endTrim || 0;
-  let virtualEnd = video.duration - endTrim;
+  let virtualEnd =
+    video.duration -
+    (def.endTrim || 0);
 
-  if (video.currentTime >= virtualEnd) {
+  if (
+    video.currentTime >= virtualEnd
+  ) {
     try {
-      video.currentTime = loopStart;
+      video.currentTime =
+        def.startAt || 0;
     } catch (e) {}
 
-    video.play().catch(function (err) {
-      console.log("MANUAL LOOP PLAY FAILED:", currentScene, err);
-    });
+    video
+      .play()
+      .catch(function (err) {
+        console.log(
+          "MANUAL LOOP PLAY FAILED:",
+          currentScene,
+          err,
+        );
+      });
   }
 }
 
@@ -743,21 +1027,25 @@ function setupCamera() {
       width: CAM_W,
       height: CAM_H,
     },
+
     audio: false,
   });
 
   webcam.hide();
 
-  handPose.detectStart(webcam, gotHands);
-  faceMesh.detectStart(webcam, gotFaces);
-}
+  handPose.detectStart(
+    webcam,
+    function (results) {
+      hands = results;
+    },
+  );
 
-function gotHands(results) {
-  hands = results;
-}
-
-function gotFaces(results) {
-  faces = results;
+  faceMesh.detectStart(
+    webcam,
+    function (results) {
+      faces = results;
+    },
+  );
 }
 
 /* -----------------------------
@@ -768,16 +1056,35 @@ function updateInteraction() {
   detectFaceForSound();
   updateHandCursor();
 
-  if (currentScene === "logoLoop" && !isCrossfading) {
+  if (
+    currentScene === "logoLoop" &&
+    !isCrossfading
+  ) {
     detectOpenCloseHandToContinue();
   }
 
-  if (currentScene === "scene02Choice" && !isCrossfading) {
+  if (
+    currentScene ===
+      "scene02Choice" &&
+    !isCrossfading
+  ) {
     detectPronounSelection();
   }
 
-  if (currentScene === "scene05VoiceLoop" && !isCrossfading) {
+  if (
+    currentScene ===
+      "scene05VoiceLoop" &&
+    !isCrossfading
+  ) {
     detectMouthMovementForVoiceScan();
+  }
+
+  if (
+    currentScene ===
+      "scene06SeasonsChoice" &&
+    !isCrossfading
+  ) {
+    detectSeasonSelection();
   }
 }
 
@@ -789,8 +1096,13 @@ function detectFaceForSound() {
       faceSeenSince = millis();
     }
 
-    if (millis() - faceSeenSince > faceHoldToUnlockAudio) {
-      unlockAudio("face detected");
+    if (
+      millis() - faceSeenSince >
+      faceHoldToUnlockAudio
+    ) {
+      unlockAudio(
+        "face detected",
+      );
     }
   } else {
     faceSeenSince = 0;
@@ -803,8 +1115,9 @@ function updateHandCursor() {
     return;
   }
 
-  let hand = hands[0];
-  let p = getHandCenterPoint(hand);
+  let p = getHandCenterPoint(
+    hands[0],
+  );
 
   if (!p) {
     handCursor.visible = false;
@@ -814,36 +1127,71 @@ function updateHandCursor() {
   let mappedX;
 
   if (mirrorHandX) {
-    mappedX = W - (p.x / CAM_W) * W;
+    mappedX =
+      W -
+      (p.x / CAM_W) * W;
   } else {
-    mappedX = (p.x / CAM_W) * W;
+    mappedX =
+      (p.x / CAM_W) * W;
   }
 
-  let mappedY = (p.y / CAM_H) * H;
+  let mappedY =
+    (p.y / CAM_H) * H;
 
-  mappedX = constrain(mappedX, 0, W);
-  mappedY = constrain(mappedY, 0, H);
+  mappedX = constrain(
+    mappedX,
+    0,
+    W,
+  );
+
+  mappedY = constrain(
+    mappedY,
+    0,
+    H,
+  );
 
   if (!handCursor.visible) {
     handCursor.x = mappedX;
     handCursor.y = mappedY;
   } else {
-    handCursor.x = lerp(handCursor.x, mappedX, 0.35);
-    handCursor.y = lerp(handCursor.y, mappedY, 0.35);
+    handCursor.x = lerp(
+      handCursor.x,
+      mappedX,
+      0.35,
+    );
+
+    handCursor.y = lerp(
+      handCursor.y,
+      mappedY,
+      0.35,
+    );
   }
 
   handCursor.visible = true;
 }
 
 function getHandCenterPoint(hand) {
-  let indexes = [0, 5, 9, 13, 17];
+  let indexes = [
+    0,
+    5,
+    9,
+    13,
+    17,
+  ];
 
   let sumX = 0;
   let sumY = 0;
   let count = 0;
 
-  for (let i = 0; i < indexes.length; i++) {
-    let p = getHandPoint(hand, indexes[i]);
+  for (
+    let i = 0;
+    i < indexes.length;
+    i++
+  ) {
+    let p = getHandPoint(
+      hand,
+      indexes[i],
+    );
 
     if (p) {
       sumX += p.x;
@@ -859,29 +1207,45 @@ function getHandCenterPoint(hand) {
     };
   }
 
-  return getHandPoint(hand, 8);
+  return getHandPoint(
+    hand,
+    8,
+  );
 }
 
 function detectOpenCloseHandToContinue() {
   if (hands.length === 0) {
-    gesturePhase = "waitingOpen";
+    gesturePhase =
+      "waitingOpen";
+
     openSince = 0;
     closedSince = 0;
+
     return;
   }
 
-  let hand = hands[0];
-  let state = getHandOpenCloseState(hand);
+  let state =
+    getHandOpenCloseState(
+      hands[0],
+    );
+
   let now = millis();
 
-  if (gesturePhase === "waitingOpen") {
+  if (
+    gesturePhase === "waitingOpen"
+  ) {
     if (state === "open") {
       if (openSince === 0) {
         openSince = now;
       }
 
-      if (now - openSince > openHoldTime) {
-        gesturePhase = "waitingClosed";
+      if (
+        now - openSince >
+        openHoldTime
+      ) {
+        gesturePhase =
+          "waitingClosed";
+
         closedSince = 0;
       }
     } else {
@@ -889,23 +1253,34 @@ function detectOpenCloseHandToContinue() {
     }
   }
 
-  if (gesturePhase === "waitingClosed") {
+  if (
+    gesturePhase ===
+    "waitingClosed"
+  ) {
     if (state === "closed") {
       if (closedSince === 0) {
         closedSince = now;
       }
 
       if (
-        now - closedSince > closedHoldTime &&
-        now - lastHandGestureTime > gestureCooldown
+        now - closedSince >
+          closedHoldTime &&
+        now -
+          lastHandGestureTime >
+          gestureCooldown
       ) {
-        lastHandGestureTime = now;
+        lastHandGestureTime =
+          now;
 
-        gesturePhase = "waitingOpen";
+        gesturePhase =
+          "waitingOpen";
+
         openSince = 0;
         closedSince = 0;
 
-        playScene("logoToScene01");
+        playScene(
+          "logoToScene01",
+        );
       }
     } else {
       closedSince = 0;
@@ -914,94 +1289,248 @@ function detectOpenCloseHandToContinue() {
 }
 
 function detectPronounSelection() {
-  if (hands.length === 0 || !handCursor.visible) {
-    resetChoiceGesture();
+  updateChoiceGesture(
+    pronounChoiceGesture,
+    getHoveredPronounKey(),
+    selectPronoun,
+  );
+}
+
+function detectSeasonSelection() {
+  updateChoiceGesture(
+    seasonChoiceGesture,
+    getHoveredSeasonKey(),
+    selectSeason,
+  );
+}
+
+function updateChoiceGesture(
+  stateObject,
+  hoveredKey,
+  onSelect,
+) {
+  if (
+    hands.length === 0 ||
+    !handCursor.visible ||
+    !hoveredKey
+  ) {
+    resetChoiceGesture(
+      stateObject,
+    );
+
     return;
   }
 
-  let hoveredKey = getHoveredPronounKey();
+  let handState =
+    getHandOpenCloseState(
+      hands[0],
+    );
 
-  if (!hoveredKey) {
-    resetChoiceGesture();
-    return;
-  }
-
-  let hand = hands[0];
-  let state = getHandOpenCloseState(hand);
   let now = millis();
 
-  if (choiceGesturePhase === "waitingOpen") {
-    if (state === "open") {
-      if (choiceOpenSince === 0 || choiceTargetKey !== hoveredKey) {
-        choiceOpenSince = now;
-        choiceTargetKey = hoveredKey;
-      }
+  if (
+    stateObject.phase ===
+    "waitingOpen"
+  ) {
+    if (handState === "open") {
+      if (
+        stateObject.openSince ===
+          0 ||
+        stateObject.targetKey !==
+          hoveredKey
+      ) {
+        stateObject.openSince =
+          now;
 
-      if (now - choiceOpenSince > openHoldTime) {
-        choiceGesturePhase = "waitingClosed";
-        choiceClosedSince = 0;
-      }
-    } else {
-      choiceOpenSince = 0;
-      choiceTargetKey = hoveredKey;
-    }
-  }
-
-  if (choiceGesturePhase === "waitingClosed") {
-    if (hoveredKey !== choiceTargetKey) {
-      resetChoiceGesture();
-      return;
-    }
-
-    if (state === "closed") {
-      if (choiceClosedSince === 0) {
-        choiceClosedSince = now;
+        stateObject.targetKey =
+          hoveredKey;
       }
 
       if (
-        now - choiceClosedSince > closedHoldTime &&
-        now - lastChoiceGestureTime > choiceGestureCooldown
+        now -
+          stateObject.openSince >
+        openHoldTime
       ) {
-        lastChoiceGestureTime = now;
-        selectPronoun(hoveredKey);
+        stateObject.phase =
+          "waitingClosed";
+
+        stateObject.closedSince =
+          0;
       }
     } else {
-      choiceClosedSince = 0;
+      stateObject.openSince = 0;
+      stateObject.targetKey =
+        hoveredKey;
+    }
+  }
+
+  if (
+    stateObject.phase ===
+    "waitingClosed"
+  ) {
+    if (
+      hoveredKey !==
+      stateObject.targetKey
+    ) {
+      resetChoiceGesture(
+        stateObject,
+      );
+
+      return;
+    }
+
+    if (handState === "closed") {
+      if (
+        stateObject.closedSince ===
+        0
+      ) {
+        stateObject.closedSince =
+          now;
+      }
+
+      if (
+        now -
+          stateObject.closedSince >
+          closedHoldTime &&
+        now -
+          stateObject.lastGestureTime >
+          stateObject.cooldown
+      ) {
+        stateObject.lastGestureTime =
+          now;
+
+        onSelect(hoveredKey);
+      }
+    } else {
+      stateObject.closedSince = 0;
     }
   }
 }
 
-function resetChoiceGesture() {
-  choiceGesturePhase = "waitingOpen";
-  choiceOpenSince = 0;
-  choiceClosedSince = 0;
-  choiceTargetKey = "";
+function resetChoiceGesture(
+  stateObject,
+) {
+  stateObject.phase =
+    "waitingOpen";
+
+  stateObject.openSince = 0;
+  stateObject.closedSince = 0;
+  stateObject.targetKey = "";
 }
 
 function selectPronoun(keyName) {
-  let answerVideoId = PRONOUN_ANSWER_VIDEOS[keyName];
+  let answerVideoId =
+    PRONOUN_ANSWER_VIDEOS[
+      keyName
+    ];
 
-  if (!answerVideoId) {
-    console.log("Missing answer for:", keyName);
-    return;
-  }
+  if (!answerVideoId) return;
 
-  console.log("PRONOUN SELECTED:", keyName, "->", answerVideoId);
+  console.log(
+    "PRONOUN SELECTED:",
+    keyName,
+    "->",
+    answerVideoId,
+  );
 
-  resetChoiceGesture();
-  startCrossfade("scene02Choice", answerVideoId);
+  resetChoiceGesture(
+    pronounChoiceGesture,
+  );
+
+  startCrossfade(
+    "scene02Choice",
+    answerVideoId,
+  );
+}
+
+function selectSeason(keyName) {
+  let inVideoId =
+    SEASON_IN_VIDEOS[
+      keyName
+    ];
+
+  if (!inVideoId) return;
+
+  console.log(
+    "SEASON SELECTED:",
+    keyName,
+    "->",
+    inVideoId,
+  );
+
+  resetChoiceGesture(
+    seasonChoiceGesture,
+  );
+
+  startCrossfade(
+    "scene06SeasonsChoice",
+    inVideoId,
+  );
 }
 
 function getHoveredPronounKey() {
-  if (isCursorOverPronoun("he")) return "he";
-  if (isCursorOverPronoun("she")) return "she";
-  if (isCursorOverPronoun("they")) return "they";
+  let keys = [
+    "he",
+    "she",
+    "they",
+  ];
+
+  for (
+    let i = 0;
+    i < keys.length;
+    i++
+  ) {
+    let keyName = keys[i];
+
+    if (
+      isCursorOverChoice(
+        keyName,
+        PRONOUN_POSITIONS,
+        pronounBaseSize,
+        pronounTracking,
+        "scene02Choice",
+      )
+    ) {
+      return keyName;
+    }
+  }
+
+  return "";
+}
+
+function getHoveredSeasonKey() {
+  let keys = [
+    "summer",
+    "winter",
+    "spring",
+    "autumn",
+  ];
+
+  for (
+    let i = 0;
+    i < keys.length;
+    i++
+  ) {
+    let keyName = keys[i];
+
+    if (
+      isCursorOverChoice(
+        keyName,
+        SEASON_POSITIONS,
+        seasonBaseSize,
+        seasonTracking,
+        "scene06SeasonsChoice",
+      )
+    ) {
+      return keyName;
+    }
+  }
 
   return "";
 }
 
 /* -----------------------------
-   VOICE SCAN BY MOUTH MOVEMENT
+   VOICE SCAN
 ----------------------------- */
 
 function resetVoiceScanState() {
@@ -1023,92 +1552,136 @@ function resetVoiceScanState() {
 }
 
 function detectMouthMovementForVoiceScan() {
-  if (voiceElementTriggered) return;
-
-  if (millis() - voiceLoopEnteredAt < voiceDetectionDelay) return;
-
-  if (faces.length === 0) {
-    mouthPrevRatio = null;
-    mouthBaselineRatio = null;
-    mouthActivityFrames = 0;
-
-    mouthCalibrationStartedAt = 0;
-    mouthCalibrationSamples = [];
-    mouthCalibrationDone = false;
+  if (voiceElementTriggered) {
     return;
   }
 
-  let face = faces[0];
-  let ratio = getMouthOpenRatio(face);
+  if (
+    millis() -
+      voiceLoopEnteredAt <
+    voiceDetectionDelay
+  ) {
+    return;
+  }
+
+  if (faces.length === 0) {
+    resetMouthCalibration();
+    return;
+  }
+
+  let ratio =
+    getMouthOpenRatio(
+      faces[0],
+    );
 
   if (ratio === null) {
-    mouthPrevRatio = null;
-    mouthBaselineRatio = null;
-    mouthActivityFrames = 0;
-
-    mouthCalibrationStartedAt = 0;
-    mouthCalibrationSamples = [];
-    mouthCalibrationDone = false;
+    resetMouthCalibration();
     return;
   }
 
   if (!mouthCalibrationDone) {
-    if (mouthCalibrationStartedAt === 0) {
-      mouthCalibrationStartedAt = millis();
+    if (
+      mouthCalibrationStartedAt ===
+      0
+    ) {
+      mouthCalibrationStartedAt =
+        millis();
+
       mouthCalibrationSamples = [];
 
-      console.log("MOUTH CALIBRATION STARTED");
+      console.log(
+        "MOUTH CALIBRATION STARTED",
+      );
     }
 
-    mouthCalibrationSamples.push(ratio);
+    mouthCalibrationSamples.push(
+      ratio,
+    );
 
-    if (millis() - mouthCalibrationStartedAt >= mouthCalibrationDuration) {
+    if (
+      millis() -
+        mouthCalibrationStartedAt >=
+      mouthCalibrationDuration
+    ) {
       let sum = 0;
 
-      for (let i = 0; i < mouthCalibrationSamples.length; i++) {
-        sum += mouthCalibrationSamples[i];
+      for (
+        let i = 0;
+        i <
+        mouthCalibrationSamples.length;
+        i++
+      ) {
+        sum +=
+          mouthCalibrationSamples[i];
       }
 
-      mouthBaselineRatio = sum / mouthCalibrationSamples.length;
+      mouthBaselineRatio =
+        sum /
+        mouthCalibrationSamples.length;
+
       mouthPrevRatio = ratio;
       mouthActivityFrames = 0;
       mouthCalibrationDone = true;
 
-      console.log("MOUTH CALIBRATION DONE. baseline:", mouthBaselineRatio);
+      console.log(
+        "MOUTH CALIBRATION DONE. baseline:",
+        mouthBaselineRatio,
+      );
     }
 
     return;
   }
 
-  let movement = abs(ratio - mouthPrevRatio);
-  let openAboveBaseline = ratio - mouthBaselineRatio;
+  let movement = abs(
+    ratio - mouthPrevRatio,
+  );
+
+  let openAboveBaseline =
+    ratio - mouthBaselineRatio;
 
   let mouthLooksActive =
-    openAboveBaseline > mouthOpenAboveBaselineThreshold &&
+    openAboveBaseline >
+      mouthOpenAboveBaselineThreshold &&
     (
-      movement > mouthMovementDeltaThreshold ||
-      openAboveBaseline > mouthOpenAboveBaselineThreshold * 1.6
+      movement >
+        mouthMovementDeltaThreshold ||
+      openAboveBaseline >
+        mouthOpenAboveBaselineThreshold *
+          1.6
     );
 
   if (mouthLooksActive) {
     mouthActivityFrames++;
   } else {
-    mouthActivityFrames = max(0, mouthActivityFrames - 1);
-    mouthBaselineRatio = lerp(mouthBaselineRatio, ratio, 0.01);
+    mouthActivityFrames = max(
+      0,
+      mouthActivityFrames - 1,
+    );
+
+    mouthBaselineRatio = lerp(
+      mouthBaselineRatio,
+      ratio,
+      0.01,
+    );
   }
 
   mouthPrevRatio = ratio;
-
   mouthDebugCounter++;
 
-  if (mouthDebugCounter % 8 === 0) {
+  if (
+    mouthDebugCounter % 8 === 0
+  ) {
     console.log(
       "mouth ratio:",
       ratio.toFixed(4),
       "baseline:",
-      mouthBaselineRatio.toFixed(4),
+      mouthBaselineRatio.toFixed(
+        4,
+      ),
       "above:",
-      openAboveBaseline.toFixed(4),
+      openAboveBaseline.toFixed(
+        4,
+      ),
       "movement:",
       movement.toFixed(4),
       "frames:",
@@ -1116,18 +1689,53 @@ function detectMouthMovementForVoiceScan() {
     );
   }
 
-  if (mouthActivityFrames >= mouthActivityFramesNeeded) {
-    triggerVoiceScanElement("mouth movement");
+  if (
+    mouthActivityFrames >=
+    mouthActivityFramesNeeded
+  ) {
+    triggerVoiceScanElement(
+      "mouth movement",
+    );
   }
 }
 
-function getMouthOpenRatio(face) {
-  let upperLip = getFacePoint(face, 13);
-  let lowerLip = getFacePoint(face, 14);
-  let mouthLeft = getFacePoint(face, 61);
-  let mouthRight = getFacePoint(face, 291);
+function resetMouthCalibration() {
+  mouthPrevRatio = null;
+  mouthBaselineRatio = null;
+  mouthActivityFrames = 0;
 
-  if (!upperLip || !lowerLip || !mouthLeft || !mouthRight) {
+  mouthCalibrationStartedAt = 0;
+  mouthCalibrationSamples = [];
+  mouthCalibrationDone = false;
+}
+
+function getMouthOpenRatio(face) {
+  let upperLip = getFacePoint(
+    face,
+    13,
+  );
+
+  let lowerLip = getFacePoint(
+    face,
+    14,
+  );
+
+  let mouthLeft = getFacePoint(
+    face,
+    61,
+  );
+
+  let mouthRight = getFacePoint(
+    face,
+    291,
+  );
+
+  if (
+    !upperLip ||
+    !lowerLip ||
+    !mouthLeft ||
+    !mouthRight
+  ) {
     return null;
   }
 
@@ -1145,17 +1753,28 @@ function getMouthOpenRatio(face) {
     mouthRight.y,
   );
 
-  if (mouthWidth <= 0) return null;
+  if (mouthWidth <= 0) {
+    return null;
+  }
 
   return mouthOpen / mouthWidth;
 }
 
-function getFacePoint(face, index) {
-  if (face.keypoints && face.keypoints[index]) {
+function getFacePoint(
+  face,
+  index,
+) {
+  if (
+    face.keypoints &&
+    face.keypoints[index]
+  ) {
     return face.keypoints[index];
   }
 
-  if (face.landmarks && face.landmarks[index]) {
+  if (
+    face.landmarks &&
+    face.landmarks[index]
+  ) {
     return {
       x: face.landmarks[index][0],
       y: face.landmarks[index][1],
@@ -1165,19 +1784,32 @@ function getFacePoint(face, index) {
   return null;
 }
 
-function triggerVoiceScanElement(reason = "unknown") {
-  if (currentScene !== "scene05VoiceLoop") return;
-  if (isCrossfading) return;
-  if (voiceElementTriggered) return;
-
-  let video = videos.scene05ScanVoiceElement;
-
-  if (!video) {
-    console.log("Missing voice scan element video");
+function triggerVoiceScanElement(
+  reason = "unknown",
+) {
+  if (
+    currentScene !==
+    "scene05VoiceLoop"
+  ) {
     return;
   }
 
-  console.log("VOICE SCAN ELEMENT TRIGGERED BY:", reason);
+  if (
+    isCrossfading ||
+    voiceElementTriggered
+  ) {
+    return;
+  }
+
+  let video =
+    videos.scene05ScanVoiceElement;
+
+  if (!video) return;
+
+  console.log(
+    "VOICE SCAN ELEMENT TRIGGERED BY:",
+    reason,
+  );
 
   voiceElementTriggered = true;
   voiceElementPlaying = true;
@@ -1188,7 +1820,12 @@ function triggerVoiceScanElement(reason = "unknown") {
 
   video.el.loop = false;
   video.el.muted = true;
-  video.el.setAttribute("muted", "");
+
+  video.el.setAttribute(
+    "muted",
+    "",
+  );
+
   video.el.volume = 0;
 
   try {
@@ -1197,40 +1834,64 @@ function triggerVoiceScanElement(reason = "unknown") {
 
   playVoiceScanSound();
 
-  video.el.play().catch(function (err) {
-    console.log("VOICE ELEMENT PLAY FAILED:", err);
-  });
+  video.el
+    .play()
+    .catch(function (err) {
+      console.log(
+        "VOICE ELEMENT PLAY FAILED:",
+        err,
+      );
+    });
 }
 
 function checkVoiceElementEnd() {
-  if (!voiceElementPlaying) return;
+  if (!voiceElementPlaying) {
+    return;
+  }
 
-  let video = videos.scene05ScanVoiceElement;
+  let video =
+    videos.scene05ScanVoiceElement;
 
-  if (!video || !video.el || !video.el.duration) return;
+  if (
+    !video ||
+    !video.el.duration
+  ) {
+    return;
+  }
 
   let elementHasEnded =
     video.el.ended ||
-    video.el.currentTime >= video.el.duration - 0.05;
+    video.el.currentTime >=
+      video.el.duration - 0.05;
 
-  if (!voiceAnsDelayActive && elementHasEnded) {
+  if (
+    !voiceAnsDelayActive &&
+    elementHasEnded
+  ) {
     stopVoiceScanSound();
 
     voiceAnsDelayActive = true;
-    voiceAnsDelayStartedAt = millis();
+    voiceAnsDelayStartedAt =
+      millis();
+
     return;
   }
 
   if (
     voiceAnsDelayActive &&
-    millis() - voiceAnsDelayStartedAt >= voiceAnsDelayMs
+    millis() -
+      voiceAnsDelayStartedAt >=
+      voiceAnsDelayMs
   ) {
     voiceElementPlaying = false;
     voiceElementActive = false;
 
     stopVoiceScanSound();
 
-    startCrossfade("scene05VoiceLoop", "scene05ScanVoiceAns");
+    startCrossfade(
+      "scene05VoiceLoop",
+      "scene05ScanVoiceAns",
+    );
   }
 }
 
@@ -1238,61 +1899,108 @@ function checkVoiceElementEnd() {
    HAND STATE
 ----------------------------- */
 
-function getHandOpenCloseState(hand) {
-  let wrist = getHandPoint(hand, 0);
+function getHandOpenCloseState(
+  hand,
+) {
+  let wrist = getHandPoint(
+    hand,
+    0,
+  );
 
-  let indexTip = getHandPoint(hand, 8);
-  let indexPip = getHandPoint(hand, 6);
+  let fingers = [
+    [8, 6],
+    [12, 10],
+    [16, 14],
+    [20, 18],
+  ];
 
-  let middleTip = getHandPoint(hand, 12);
-  let middlePip = getHandPoint(hand, 10);
-
-  let ringTip = getHandPoint(hand, 16);
-  let ringPip = getHandPoint(hand, 14);
-
-  let pinkyTip = getHandPoint(hand, 20);
-  let pinkyPip = getHandPoint(hand, 18);
-
-  if (
-    !wrist ||
-    !indexTip ||
-    !indexPip ||
-    !middleTip ||
-    !middlePip ||
-    !ringTip ||
-    !ringPip ||
-    !pinkyTip ||
-    !pinkyPip
-  ) {
+  if (!wrist) {
     return "unknown";
   }
 
   let extendedCount = 0;
 
-  if (isFingerExtended(wrist, indexTip, indexPip)) extendedCount++;
-  if (isFingerExtended(wrist, middleTip, middlePip)) extendedCount++;
-  if (isFingerExtended(wrist, ringTip, ringPip)) extendedCount++;
-  if (isFingerExtended(wrist, pinkyTip, pinkyPip)) extendedCount++;
+  for (
+    let i = 0;
+    i < fingers.length;
+    i++
+  ) {
+    let tip = getHandPoint(
+      hand,
+      fingers[i][0],
+    );
 
-  if (extendedCount >= 3) return "open";
-  if (extendedCount <= 1) return "closed";
+    let pip = getHandPoint(
+      hand,
+      fingers[i][1],
+    );
+
+    if (!tip || !pip) {
+      return "unknown";
+    }
+
+    if (
+      isFingerExtended(
+        wrist,
+        tip,
+        pip,
+      )
+    ) {
+      extendedCount++;
+    }
+  }
+
+  if (extendedCount >= 3) {
+    return "open";
+  }
+
+  if (extendedCount <= 1) {
+    return "closed";
+  }
 
   return "middle";
 }
 
-function isFingerExtended(wrist, tip, pip) {
-  let tipDist = dist(wrist.x, wrist.y, tip.x, tip.y);
-  let pipDist = dist(wrist.x, wrist.y, pip.x, pip.y);
+function isFingerExtended(
+  wrist,
+  tip,
+  pip,
+) {
+  let tipDist = dist(
+    wrist.x,
+    wrist.y,
+    tip.x,
+    tip.y,
+  );
 
-  return tipDist > pipDist * 1.08;
+  let pipDist = dist(
+    wrist.x,
+    wrist.y,
+    pip.x,
+    pip.y,
+  );
+
+  return (
+    tipDist >
+    pipDist * 1.08
+  );
 }
 
-function getHandPoint(hand, index) {
-  if (hand.keypoints && hand.keypoints[index]) {
+function getHandPoint(
+  hand,
+  index,
+) {
+  if (
+    hand.keypoints &&
+    hand.keypoints[index]
+  ) {
     return hand.keypoints[index];
   }
 
-  if (hand.landmarks && hand.landmarks[index]) {
+  if (
+    hand.landmarks &&
+    hand.landmarks[index]
+  ) {
     return {
       x: hand.landmarks[index][0],
       y: hand.landmarks[index][1],
@@ -1309,116 +2017,85 @@ function getHandPoint(hand, index) {
 function checkAutoTransition() {
   if (isCrossfading) return;
 
-  if (currentScene === "logoToScene01") {
-    checkVideoEndForCrossfade("logoToScene01", "scene01");
-  }
-
-  if (currentScene === "scene01") {
-    checkVideoEndForCrossfade("scene01", "scene02Intro");
-  }
-
-  if (currentScene === "scene02Intro") {
-    checkVideoEndForCrossfade("scene02Intro", "scene02Choice");
-  }
-
-  if (currentScene === "scene02AnsShe") {
-    checkVideoEndForCrossfade(
-      "scene02AnsShe",
-      "scene03SheToLoveFace",
-    );
-  }
-
-  if (currentScene === "scene02AnsHe") {
-    checkVideoEndForCrossfade(
-      "scene02AnsHe",
-      "scene03HeToLoveFace",
-    );
-  }
-
-  if (currentScene === "scene02AnsThey") {
-    checkVideoEndForCrossfade(
-      "scene02AnsThey",
-      "scene03TheyToLoveFace",
-    );
-  }
-
-  if (currentScene === "scene03SheToLoveFace") {
-    checkVideoEndForCrossfade(
-      "scene03SheToLoveFace",
-      "scene05ScanVoiceOnly",
-    );
-  }
-
-  if (currentScene === "scene03HeToLoveFace") {
-    checkVideoEndForCrossfade(
-      "scene03HeToLoveFace",
-      "scene05ScanVoiceOnly",
-    );
-  }
-
-  if (currentScene === "scene03TheyToLoveFace") {
-    checkVideoEndForCrossfade(
-      "scene03TheyToLoveFace",
-      "scene05ScanVoiceOnly",
-    );
-  }
-
-  if (currentScene === "scene05ScanVoiceOnly") {
-    checkVideoEndForCrossfade(
-      "scene05ScanVoiceOnly",
-      "scene05VoiceLoop",
-    );
-  }
-
-  if (currentScene === "scene05VoiceLoop") {
+  if (
+    currentScene ===
+    "scene05VoiceLoop"
+  ) {
     checkVoiceElementEnd();
+    return;
   }
 
-  if (currentScene === "scene05ScanVoiceAns") {
-    checkVideoEndForCrossfade(
-      "scene05ScanVoiceAns",
-      "scene06SeasonsIntro",
-    );
-  }
+  let targetScene =
+    AUTO_VIDEO_TRANSITIONS[
+      currentScene
+    ];
 
-  if (currentScene === "scene06SeasonsIntro") {
+  if (targetScene) {
     checkVideoEndForCrossfade(
-      "scene06SeasonsIntro",
-      "scene06SeasonsChoice",
+      currentScene,
+      targetScene,
     );
   }
 }
 
-function checkVideoEndForCrossfade(fromSceneId, toSceneId) {
-  if (!videos[fromSceneId]) return;
+function checkVideoEndForCrossfade(
+  fromSceneId,
+  toSceneId,
+) {
+  if (!videos[fromSceneId]) {
+    return;
+  }
 
-  let fromVideo = videos[fromSceneId].el;
-  let fromDef = VIDEO_FILES[fromSceneId];
+  let fromVideo =
+    videos[fromSceneId].el;
 
-  if (!fromVideo.duration) return;
+  let fromDefinition =
+    VIDEO_FILES[fromSceneId];
 
-  let endTrim = fromDef.endTrim || 0;
-  let virtualEnd = fromVideo.duration - endTrim;
-  let timeLeft = virtualEnd - fromVideo.currentTime;
+  if (!fromVideo.duration) {
+    return;
+  }
 
-  if (timeLeft <= crossfadeDuration) {
-    startCrossfade(fromSceneId, toSceneId);
+  let virtualEnd =
+    fromVideo.duration -
+    (fromDefinition.endTrim || 0);
+
+  let timeLeft =
+    virtualEnd -
+    fromVideo.currentTime;
+
+  if (
+    timeLeft <=
+    crossfadeDuration
+  ) {
+    startCrossfade(
+      fromSceneId,
+      toSceneId,
+    );
   }
 }
 
-function startCrossfade(fromSceneId, toSceneId) {
+function startCrossfade(
+  fromSceneId,
+  toSceneId,
+) {
   if (isCrossfading) return;
 
-  let fromIsLayerScene =
-    fromSceneId === "scene02Choice" ||
-    fromSceneId === "scene05VoiceLoop" ||
-    fromSceneId === "scene06SeasonsChoice" ||
-    fromSceneId === "successScreen";
+  let validFrom =
+    videos[fromSceneId] ||
+    [
+      "scene02Choice",
+      "scene05VoiceLoop",
+      "scene06SeasonsChoice",
+      "successScreen",
+    ].includes(fromSceneId);
 
-  let fromIsVideo = !!videos[fromSceneId];
+  if (!validFrom) {
+    console.log(
+      "Missing crossfade from scene:",
+      fromSceneId,
+    );
 
-  if (!fromIsLayerScene && !fromIsVideo) {
-    console.log("Missing crossfade from scene:", fromSceneId);
     return;
   }
 
@@ -1431,113 +2108,240 @@ function startCrossfade(fromSceneId, toSceneId) {
     fadeStartTime: 0,
   };
 
-  if (toSceneId === "scene02Choice") {
-    startScene02ChoiceVideos(true);
-    return;
-  }
-
-  if (toSceneId === "scene05VoiceLoop") {
-    startScene05VoiceLoopVideos(true);
-    return;
-  }
-
-  if (toSceneId === "scene06SeasonsChoice") {
-    return;
-  }
-
-  if (toSceneId === "successScreen") {
-    return;
-  }
-
-  if (videos[toSceneId]) {
-    let toVideo = videos[toSceneId];
-
-    toVideo.el.loop = false;
-    applyAudioState(toSceneId, 0);
-
-    try {
-      toVideo.el.currentTime =
-        VIDEO_FILES[toSceneId].startAt || 0;
-    } catch (e) {}
-
-    toVideo.el.play().catch(function (err) {
-      console.log("PLAY NEXT FAILED:", toSceneId, err);
-    });
-  }
+  prepareTransitionTarget(
+    toSceneId,
+  );
 }
 
-function isTransitionTargetReady(toSceneId) {
-  if (toSceneId === "scene02Choice") {
-    return (
-      videos.scene02Background &&
-      videos.scene02BlobLoop &&
-      videos.scene02Background.el.readyState > 0 &&
-      videos.scene02BlobLoop.el.readyState > 0
+function prepareTransitionTarget(
+  toSceneId,
+) {
+  if (
+    toSceneId ===
+    "scene02Choice"
+  ) {
+    startScene02ChoiceVideos(
+      true,
+    );
+
+    return;
+  }
+
+  if (
+    toSceneId ===
+    "scene05VoiceLoop"
+  ) {
+    startScene05VoiceLoopVideos(
+      true,
+    );
+
+    return;
+  }
+
+  if (
+    toSceneId ===
+    "scene06SeasonsChoice"
+  ) {
+    startScene06SeasonsChoiceVideos(
+      true,
+    );
+
+    return;
+  }
+
+  if (
+    toSceneId ===
+    "successScreen"
+  ) {
+    return;
+  }
+
+  let video =
+    videos[toSceneId];
+
+  if (!video) return;
+
+  video.el.loop =
+    VIDEO_FILES[toSceneId].loop ||
+    false;
+
+  applyAudioState(
+    toSceneId,
+    0,
+  );
+
+  try {
+    video.el.currentTime =
+      VIDEO_FILES[toSceneId]
+        .startAt || 0;
+  } catch (e) {}
+
+  video.el
+    .play()
+    .catch(function (err) {
+      console.log(
+        "PLAY NEXT FAILED:",
+        toSceneId,
+        err,
+      );
+    });
+}
+
+function isTransitionTargetReady(
+  toSceneId,
+) {
+  if (
+    toSceneId ===
+    "scene02Choice"
+  ) {
+    return layerVideosReady(
+      "scene02Background",
+      "scene02BlobLoop",
     );
   }
 
-  if (toSceneId === "scene05VoiceLoop") {
-    return (
-      videos.scene05ScanVoiceBackground &&
-      videos.scene05ScanVoiceBlob &&
-      videos.scene05ScanVoiceBackground.el.readyState > 0 &&
-      videos.scene05ScanVoiceBlob.el.readyState > 0
+  if (
+    toSceneId ===
+    "scene05VoiceLoop"
+  ) {
+    return layerVideosReady(
+      "scene05ScanVoiceBackground",
+      "scene05ScanVoiceBlob",
     );
   }
 
-  if (toSceneId === "scene06SeasonsChoice") {
-    return !!seasonsImage;
+  if (
+    toSceneId ===
+    "scene06SeasonsChoice"
+  ) {
+    return layerVideosReady(
+      "scene06SeasonsBackground",
+      "scene06SeasonsBlobLoop",
+    );
   }
 
-  if (toSceneId === "successScreen") {
+  if (
+    toSceneId ===
+    "successScreen"
+  ) {
     return true;
   }
 
   if (videos[toSceneId]) {
-    return videos[toSceneId].el.readyState > 0;
+    return (
+      videos[toSceneId].el
+        .readyState > 0
+    );
   }
 
   return true;
 }
 
+function layerVideosReady(
+  firstId,
+  secondId,
+) {
+  return (
+    videos[firstId] &&
+    videos[secondId] &&
+    videos[firstId].el
+      .readyState > 0 &&
+    videos[secondId].el
+      .readyState > 0
+  );
+}
+
 function finishCrossfade() {
-  if (!activeTransition) return;
-
-  let fromSceneId = activeTransition.fromSceneId;
-  let toSceneId = activeTransition.toSceneId;
-
-  if (fromSceneId === "scene02Choice") {
-    stopScene02ChoiceVideos();
+  if (!activeTransition) {
+    return;
   }
 
-  if (fromSceneId === "scene05VoiceLoop") {
-    stopScene05VoiceLoopVideos();
-  }
+  let fromSceneId =
+    activeTransition.fromSceneId;
+
+  let toSceneId =
+    activeTransition.toSceneId;
+
+  stopSpecialScene(
+    fromSceneId,
+  );
 
   if (videos[fromSceneId]) {
     videos[fromSceneId].el.pause();
-    videos[fromSceneId].el.volume = 0;
+    videos[fromSceneId].el.volume =
+      0;
   }
 
   currentScene = toSceneId;
 
-  if (toSceneId === "scene02Choice") {
-    startScene02ChoiceVideos(false);
-  }
-
-  if (toSceneId === "scene05VoiceLoop") {
-    startScene05VoiceLoopVideos(false);
-  }
+  resumeSpecialScene(
+    toSceneId,
+  );
 
   if (videos[toSceneId]) {
     applyAudioState(
       toSceneId,
-      VIDEO_FILES[toSceneId].volume,
+      VIDEO_FILES[toSceneId]
+        .volume,
     );
   }
 
   isCrossfading = false;
   activeTransition = null;
+}
+
+function stopSpecialScene(
+  sceneId,
+) {
+  if (
+    sceneId === "scene02Choice"
+  ) {
+    stopScene02ChoiceVideos();
+  }
+
+  if (
+    sceneId ===
+    "scene05VoiceLoop"
+  ) {
+    stopScene05VoiceLoopVideos();
+  }
+
+  if (
+    sceneId ===
+    "scene06SeasonsChoice"
+  ) {
+    stopScene06SeasonsChoiceVideos();
+  }
+}
+
+function resumeSpecialScene(
+  sceneId,
+) {
+  if (
+    sceneId === "scene02Choice"
+  ) {
+    startScene02ChoiceVideos(
+      false,
+    );
+  }
+
+  if (
+    sceneId ===
+    "scene05VoiceLoop"
+  ) {
+    startScene05VoiceLoopVideos(
+      false,
+    );
+  }
+
+  if (
+    sceneId ===
+    "scene06SeasonsChoice"
+  ) {
+    startScene06SeasonsChoiceVideos(
+      false,
+    );
+  }
 }
 
 /* -----------------------------
@@ -1550,141 +2354,229 @@ function drawCurrentScene() {
     return;
   }
 
-  if (currentScene === "scene02Choice") {
-    drawScene02Choice(1, true);
-    return;
-  }
-
-  if (currentScene === "scene05VoiceLoop") {
-    drawScene05VoiceLoop(1);
-    return;
-  }
-
-  if (currentScene === "scene06SeasonsChoice") {
-    drawScene06Seasons(1);
-    return;
-  }
-
-  if (currentScene === "successScreen") {
-    drawSuccessScreen(1);
-    return;
-  }
-
-  drawVideo(currentScene, 1);
+  drawSceneById(
+    currentScene,
+    1,
+    true,
+  );
 }
 
 function drawCrossfade() {
-  if (!activeTransition) return;
-
-  let fromSceneId = activeTransition.fromSceneId;
-  let toSceneId = activeTransition.toSceneId;
-
-  if (!isTransitionTargetReady(toSceneId)) {
-    drawSceneById(fromSceneId, 1, false);
+  if (!activeTransition) {
     return;
   }
 
-  if (!activeTransition.fadeStarted) {
-    activeTransition.fadeStarted = true;
-    activeTransition.fadeStartTime = millis();
+  let fromSceneId =
+    activeTransition.fromSceneId;
+
+  let toSceneId =
+    activeTransition.toSceneId;
+
+  if (
+    !isTransitionTargetReady(
+      toSceneId,
+    )
+  ) {
+    drawSceneById(
+      fromSceneId,
+      1,
+      false,
+    );
+
+    return;
   }
 
-  let p =
-    (millis() - activeTransition.fadeStartTime) /
-    (crossfadeDuration * 1000);
+  if (
+    !activeTransition.fadeStarted
+  ) {
+    activeTransition.fadeStarted =
+      true;
 
-  p = constrain(p, 0, 1);
+    activeTransition.fadeStartTime =
+      millis();
+  }
 
-  drawSceneById(fromSceneId, 1, false);
-  drawSceneById(toSceneId, p, true);
+  let progress = constrain(
+    (
+      millis() -
+      activeTransition.fadeStartTime
+    ) /
+      (
+        crossfadeDuration *
+        1000
+      ),
+    0,
+    1,
+  );
+
+  drawSceneById(
+    fromSceneId,
+    1,
+    false,
+  );
+
+  drawSceneById(
+    toSceneId,
+    progress,
+    true,
+  );
 
   if (audioUnlocked) {
     if (videos[fromSceneId]) {
-      videos[fromSceneId].el.volume =
-        VIDEO_FILES[fromSceneId].volume * (1 - p);
+      videos[
+        fromSceneId
+      ].el.volume =
+        VIDEO_FILES[
+          fromSceneId
+        ].volume *
+        (1 - progress);
     }
 
     if (videos[toSceneId]) {
-      videos[toSceneId].el.volume =
-        VIDEO_FILES[toSceneId].volume * p;
+      videos[
+        toSceneId
+      ].el.volume =
+        VIDEO_FILES[
+          toSceneId
+        ].volume *
+        progress;
     }
   }
 
-  if (p >= 1) {
+  if (progress >= 1) {
     finishCrossfade();
   }
 }
 
-function drawSceneById(sceneId, alpha = 1, showCursor = true) {
-  if (sceneId === "scene02Choice") {
-    drawScene02Choice(alpha, showCursor);
-    return;
-  }
-
-  if (sceneId === "scene05VoiceLoop") {
-    drawScene05VoiceLoop(alpha);
-    return;
-  }
-
-  if (sceneId === "scene06SeasonsChoice") {
-    drawScene06Seasons(alpha);
-    return;
-  }
-
-  if (sceneId === "successScreen") {
-    drawSuccessScreen(alpha);
-    return;
-  }
-
-  drawVideo(sceneId, alpha);
-}
-
-function drawVideo(id, alpha = 1) {
-  let video = videos[id];
-
-  if (!video) return;
-
-  if (video.el.readyState > 0) {
-    if (!firstFrameShown && id === "logoLoop") {
-      cnv.elt.style.visibility = "visible";
-      firstFrameShown = true;
-    }
-
-    drawingContext.save();
-    drawingContext.globalAlpha = alpha;
-
-    drawingContext.drawImage(
-      video.el,
-      0,
-      0,
-      W,
-      H,
+function drawSceneById(
+  sceneId,
+  alpha = 1,
+  showCursor = true,
+) {
+  if (
+    sceneId ===
+    "scene02Choice"
+  ) {
+    drawChoiceScene(
+      "scene02Background",
+      drawPronounTexts,
+      "scene02BlobLoop",
+      alpha,
+      showCursor,
     );
 
-    drawingContext.restore();
+    return;
   }
+
+  if (
+    sceneId ===
+    "scene05VoiceLoop"
+  ) {
+    drawScene05VoiceLoop(
+      alpha,
+    );
+
+    return;
+  }
+
+  if (
+    sceneId ===
+    "scene06SeasonsChoice"
+  ) {
+    drawChoiceScene(
+      "scene06SeasonsBackground",
+      drawSeasonTexts,
+      "scene06SeasonsBlobLoop",
+      alpha,
+      showCursor,
+    );
+
+    return;
+  }
+
+  if (
+    sceneId ===
+    "successScreen"
+  ) {
+    drawSuccessScreen(
+      alpha,
+    );
+
+    return;
+  }
+
+  drawVideo(
+    sceneId,
+    alpha,
+  );
 }
 
-function drawScene02Choice(alpha = 1, showCursor = true) {
-  if (!firstFrameShown) {
-    cnv.elt.style.visibility = "visible";
-    firstFrameShown = true;
+function drawVideo(
+  id,
+  alpha = 1,
+) {
+  let video = videos[id];
+
+  if (
+    !video ||
+    video.el.readyState <= 0
+  ) {
+    return;
   }
 
-  drawVideo("scene02Background", alpha);
+  if (
+    !firstFrameShown &&
+    id === "logoLoop"
+  ) {
+    showCanvas();
+  }
 
   drawingContext.save();
-  drawingContext.globalAlpha = alpha;
+  drawingContext.globalAlpha =
+    alpha;
 
-  drawPronounTexts();
+  drawingContext.drawImage(
+    video.el,
+    0,
+    0,
+    W,
+    H,
+  );
+
+  drawingContext.restore();
+}
+
+function drawChoiceScene(
+  backgroundId,
+  textFunction,
+  blobId,
+  alpha,
+  showCursor,
+) {
+  showCanvas();
+
+  drawVideo(
+    backgroundId,
+    alpha,
+  );
+
+  drawingContext.save();
+  drawingContext.globalAlpha =
+    alpha;
+
+  textFunction();
 
   drawingContext.restore();
 
-  drawVideo("scene02BlobLoop", alpha);
+  drawVideo(
+    blobId,
+    alpha,
+  );
 
   if (showCursor) {
     drawingContext.save();
-    drawingContext.globalAlpha = alpha;
+    drawingContext.globalAlpha =
+      alpha;
 
     drawHandCursor();
 
@@ -1692,205 +2584,209 @@ function drawScene02Choice(alpha = 1, showCursor = true) {
   }
 }
 
-function drawScene05VoiceLoop(alpha = 1) {
-  if (!firstFrameShown) {
-    cnv.elt.style.visibility = "visible";
-    firstFrameShown = true;
-  }
+function drawScene05VoiceLoop(
+  alpha = 1,
+) {
+  showCanvas();
 
-  drawVideo("scene05ScanVoiceBackground", alpha);
+  drawVideo(
+    "scene05ScanVoiceBackground",
+    alpha,
+  );
 
   if (voiceElementActive) {
-    drawVideo("scene05ScanVoiceElement", alpha);
-  }
-
-  drawVideo("scene05ScanVoiceBlob", alpha);
-}
-
-function drawScene06Seasons(alpha = 1) {
-  if (!firstFrameShown) {
-    cnv.elt.style.visibility = "visible";
-    firstFrameShown = true;
-  }
-
-  drawingContext.save();
-  drawingContext.globalAlpha = alpha;
-
-  if (seasonsImage) {
-    image(
-      seasonsImage,
-      0,
-      0,
-      W,
-      H,
+    drawVideo(
+      "scene05ScanVoiceElement",
+      alpha,
     );
   }
 
-  drawSeasonTexts();
-
-  drawingContext.restore();
-}
-
-function drawSeasonTexts() {
-  push();
-
-  if (pronounFont) {
-    textFont(pronounFont);
-  }
-
-  textAlign(LEFT, CENTER);
-  noStroke();
-  textSize(seasonBaseSize);
-
-  fill(
-    seasonColor[0],
-    seasonColor[1],
-    seasonColor[2],
-    seasonColor[3],
+  drawVideo(
+    "scene05ScanVoiceBlob",
+    alpha,
   );
-
-  drawSeasonWord("summer");
-  drawSeasonWord("winter");
-  drawSeasonWord("spring");
-  drawSeasonWord("autumn");
-
-  pop();
-}
-
-function drawSeasonWord(keyName) {
-  let pos = SEASON_POSITIONS[keyName];
-
-  if (!pos) return;
-
-  textSize(seasonBaseSize);
-
-  drawTrackedCenteredText(
-    pos.label,
-    pos.x,
-    pos.y,
-    seasonTracking,
-  );
-}
-
-function drawSuccessScreen(alpha = 1) {
-  drawingContext.save();
-  drawingContext.globalAlpha = alpha;
-
-  background(255);
-
-  push();
-
-  fill(0);
-  noStroke();
-  textAlign(CENTER, CENTER);
-  textSize(120);
-
-  text("sucsses", W / 2, H / 2);
-
-  pop();
-
-  drawingContext.restore();
 }
 
 function drawPronounTexts() {
+  drawChoiceTexts(
+    [
+      "he",
+      "she",
+      "they",
+    ],
+    PRONOUN_POSITIONS,
+    pronounBaseSize,
+    pronounHoverScale,
+    pronounHoverScales,
+    pronounTracking,
+    pronounColor,
+    "scene02Choice",
+  );
+
+  if (showPositionDots) {
+    let keys = [
+      "he",
+      "she",
+      "they",
+    ];
+
+    for (
+      let i = 0;
+      i < keys.length;
+      i++
+    ) {
+      let pos =
+        PRONOUN_POSITIONS[
+          keys[i]
+        ];
+
+      drawPositionDot(
+        pos.x,
+        pos.y,
+      );
+    }
+  }
+}
+
+function drawSeasonTexts() {
+  drawChoiceTexts(
+    [
+      "summer",
+      "winter",
+      "spring",
+      "autumn",
+    ],
+    SEASON_POSITIONS,
+    seasonBaseSize,
+    seasonHoverScale,
+    seasonHoverScales,
+    seasonTracking,
+    seasonColor,
+    "scene06SeasonsChoice",
+  );
+}
+
+function drawChoiceTexts(
+  keys,
+  positions,
+  baseSize,
+  hoverScale,
+  scales,
+  tracking,
+  colorValue,
+  sceneId,
+) {
   push();
 
   if (pronounFont) {
     textFont(pronounFont);
   }
 
-  textAlign(LEFT, CENTER);
+  textAlign(
+    LEFT,
+    CENTER,
+  );
+
   noStroke();
 
-  drawPronounWord("he");
-  drawPronounWord("she");
-  drawPronounWord("they");
+  fill(
+    colorValue[0],
+    colorValue[1],
+    colorValue[2],
+    colorValue[3],
+  );
 
-  if (showPositionDots) {
-    drawPositionDot(
-      PRONOUN_POSITIONS.he.x,
-      PRONOUN_POSITIONS.he.y,
+  for (
+    let i = 0;
+    i < keys.length;
+    i++
+  ) {
+    let keyName = keys[i];
+    let pos =
+      positions[keyName];
+
+    let hovering =
+      isCursorOverChoice(
+        keyName,
+        positions,
+        baseSize,
+        tracking,
+        sceneId,
+      );
+
+    let targetScale =
+      hovering
+        ? hoverScale
+        : 1;
+
+    scales[keyName] = lerp(
+      scales[keyName],
+      targetScale,
+      0.2,
     );
 
-    drawPositionDot(
-      PRONOUN_POSITIONS.she.x,
-      PRONOUN_POSITIONS.she.y,
+    textSize(
+      baseSize *
+        scales[keyName],
     );
 
-    drawPositionDot(
-      PRONOUN_POSITIONS.they.x,
-      PRONOUN_POSITIONS.they.y,
+    drawTrackedCenteredText(
+      pos.label,
+      pos.x,
+      pos.y,
+      tracking,
     );
   }
 
   pop();
 }
 
-function drawPronounWord(keyName) {
-  let pos = PRONOUN_POSITIONS[keyName];
+function isCursorOverChoice(
+  keyName,
+  positions,
+  size,
+  tracking,
+  sceneId,
+) {
+  if (
+    !handCursor.visible ||
+    currentScene !== sceneId
+  ) {
+    return false;
+  }
 
-  if (!pos) return;
-
-  let hovering = isCursorOverPronoun(keyName);
-
-  let targetScale = hovering
-    ? pronounHoverScale
-    : 1;
-
-  hoverScales[keyName] = lerp(
-    hoverScales[keyName],
-    targetScale,
-    0.2,
-  );
-
-  let currentSize =
-    pronounBaseSize * hoverScales[keyName];
-
-  textSize(currentSize);
-
-  fill(
-    pronounColor[0],
-    pronounColor[1],
-    pronounColor[2],
-    pronounColor[3],
-  );
-
-  drawTrackedCenteredText(
-    pos.label,
-    pos.x,
-    pos.y,
-    pronounTracking,
-  );
-}
-
-function isCursorOverPronoun(keyName) {
-  if (!handCursor.visible) return false;
-  if (currentScene !== "scene02Choice") return false;
-
-  let pos = PRONOUN_POSITIONS[keyName];
+  let pos =
+    positions[keyName];
 
   if (!pos) return false;
 
-  let bounds = getPronounBounds(
-    keyName,
-    pronounBaseSize,
-    pronounTracking,
-  );
+  let bounds =
+    getChoiceBounds(
+      pos,
+      size,
+      tracking,
+    );
 
   let paddingX = 90;
   let paddingY = 80;
 
   return (
-    handCursor.x >= bounds.left - paddingX &&
-    handCursor.x <= bounds.right + paddingX &&
-    handCursor.y >= bounds.top - paddingY &&
-    handCursor.y <= bounds.bottom + paddingY
+    handCursor.x >=
+      bounds.left - paddingX &&
+    handCursor.x <=
+      bounds.right + paddingX &&
+    handCursor.y >=
+      bounds.top - paddingY &&
+    handCursor.y <=
+      bounds.bottom + paddingY
   );
 }
 
-function getPronounBounds(keyName, size, tracking) {
-  let pos = PRONOUN_POSITIONS[keyName];
-
+function getChoiceBounds(
+  pos,
+  size,
+  tracking,
+) {
   push();
 
   if (pronounFont) {
@@ -1899,52 +2795,84 @@ function getPronounBounds(keyName, size, tracking) {
 
   textSize(size);
 
-  let w = getTrackedTextWidth(
-    pos.label,
-    tracking,
-  );
-
-  let h = size;
+  let width =
+    getTrackedTextWidth(
+      pos.label,
+      tracking,
+    );
 
   pop();
 
   return {
-    left: pos.x - w / 2,
-    right: pos.x + w / 2,
-    top: pos.y - h / 2,
-    bottom: pos.y + h / 2,
+    left:
+      pos.x - width / 2,
+
+    right:
+      pos.x + width / 2,
+
+    top:
+      pos.y - size / 2,
+
+    bottom:
+      pos.y + size / 2,
   };
 }
 
 function drawTrackedCenteredText(
-  txt,
+  textValue,
   centerX,
   centerY,
   tracking,
 ) {
-  let totalW = getTrackedTextWidth(
-    txt,
-    tracking,
-  );
+  let totalWidth =
+    getTrackedTextWidth(
+      textValue,
+      tracking,
+    );
 
-  let x = centerX - totalW / 2;
+  let x =
+    centerX -
+    totalWidth / 2;
 
-  for (let i = 0; i < txt.length; i++) {
-    let ch = txt.charAt(i);
+  for (
+    let i = 0;
+    i < textValue.length;
+    i++
+  ) {
+    let character =
+      textValue.charAt(i);
 
-    text(ch, x, centerY);
+    text(
+      character,
+      x,
+      centerY,
+    );
 
-    x += textWidth(ch) + tracking;
+    x +=
+      textWidth(character) +
+      tracking;
   }
 }
 
-function getTrackedTextWidth(txt, tracking) {
+function getTrackedTextWidth(
+  textValue,
+  tracking,
+) {
   let total = 0;
 
-  for (let i = 0; i < txt.length; i++) {
-    total += textWidth(txt.charAt(i));
+  for (
+    let i = 0;
+    i < textValue.length;
+    i++
+  ) {
+    total += textWidth(
+      textValue.charAt(i),
+    );
 
-    if (i < txt.length - 1) {
+    if (
+      i <
+      textValue.length - 1
+    ) {
       total += tracking;
     }
   }
@@ -1953,8 +2881,18 @@ function getTrackedTextWidth(txt, tracking) {
 }
 
 function drawHandCursor() {
-  if (currentScene !== "scene02Choice") return;
-  if (!handCursor.visible) return;
+  let cursorSceneActive =
+    currentScene ===
+      "scene02Choice" ||
+    currentScene ===
+      "scene06SeasonsChoice";
+
+  if (
+    !cursorSceneActive ||
+    !handCursor.visible
+  ) {
+    return;
+  }
 
   push();
 
@@ -1970,45 +2908,124 @@ function drawHandCursor() {
   pop();
 }
 
-function drawPositionDot(x, y) {
+function drawSuccessScreen(
+  alpha = 1,
+) {
+  drawingContext.save();
+
+  drawingContext.globalAlpha =
+    alpha;
+
+  background(255);
+
   push();
 
-  stroke(255, 0, 0);
+  fill(0);
+  noStroke();
+
+  textAlign(
+    CENTER,
+    CENTER,
+  );
+
+  textSize(120);
+
+  text(
+    "sucsses",
+    W / 2,
+    H / 2,
+  );
+
+  pop();
+
+  drawingContext.restore();
+}
+
+function drawPositionDot(
+  x,
+  y,
+) {
+  push();
+
+  stroke(
+    255,
+    0,
+    0,
+  );
+
   strokeWeight(3);
 
-  line(x - 18, y, x + 18, y);
-  line(x, y - 18, x, y + 18);
+  line(
+    x - 18,
+    y,
+    x + 18,
+    y,
+  );
+
+  line(
+    x,
+    y - 18,
+    x,
+    y + 18,
+  );
 
   noStroke();
-  fill(255, 0, 0);
 
-  circle(x, y, 8);
+  fill(
+    255,
+    0,
+    0,
+  );
+
+  circle(
+    x,
+    y,
+    8,
+  );
 
   pop();
 }
 
 /* -----------------------------
-   CANVAS FIT — CONTAIN
+   CANVAS FIT
 ----------------------------- */
 
 function fitCanvasToWindow() {
-  let scale = min(
+  let scaleAmount = min(
     windowWidth / W,
     windowHeight / H,
   );
 
-  let displayW = W * scale;
-  let displayH = H * scale;
+  let displayW =
+    W * scaleAmount;
 
-  cnv.elt.style.width = displayW + "px";
-  cnv.elt.style.height = displayH + "px";
-  cnv.elt.style.position = "absolute";
+  let displayH =
+    H * scaleAmount;
+
+  cnv.elt.style.width =
+    displayW + "px";
+
+  cnv.elt.style.height =
+    displayH + "px";
+
+  cnv.elt.style.position =
+    "absolute";
 
   cnv.elt.style.left =
-    (windowWidth - displayW) / 2 + "px";
+    (
+      windowWidth -
+      displayW
+    ) /
+      2 +
+    "px";
 
   cnv.elt.style.top =
-    (windowHeight - displayH) / 2 + "px";
+    (
+      windowHeight -
+      displayH
+    ) /
+      2 +
+    "px";
 }
 
 function windowResized() {
@@ -2020,24 +3037,43 @@ function windowResized() {
 ----------------------------- */
 
 function keyPressed() {
-  if (key === " " && currentScene === "logoLoop") {
-    unlockAudio("space key");
-    playScene("logoToScene01");
+  if (
+    key === " " &&
+    currentScene ===
+      "logoLoop"
+  ) {
+    unlockAudio(
+      "space key",
+    );
+
+    playScene(
+      "logoToScene01",
+    );
   }
 
-  // D מדלג למסך בחירת המגדר
-  if (key === "d" || key === "D") {
-    playScene("scene02Choice");
+  if (
+    key === "d" ||
+    key === "D"
+  ) {
+    playScene(
+      "scene02Choice",
+    );
   }
 
-  // S מדליק ומכבה נקודות מיקום
-  if (key === "s" || key === "S") {
-    showPositionDots = !showPositionDots;
+  if (
+    key === "s" ||
+    key === "S"
+  ) {
+    showPositionDots =
+      !showPositionDots;
   }
 
-  // M הופך את כיוון היד
-  if (key === "m" || key === "M") {
-    mirrorHandX = !mirrorHandX;
+  if (
+    key === "m" ||
+    key === "M"
+  ) {
+    mirrorHandX =
+      !mirrorHandX;
 
     console.log(
       "mirrorHandX:",
@@ -2045,61 +3081,112 @@ function keyPressed() {
     );
   }
 
-  // בחירת מגדר בלי יד
   if (
     key === "1" &&
-    currentScene === "scene02Choice"
+    currentScene ===
+      "scene02Choice"
   ) {
     selectPronoun("he");
   }
 
   if (
     key === "2" &&
-    currentScene === "scene02Choice"
+    currentScene ===
+      "scene02Choice"
   ) {
     selectPronoun("she");
   }
 
   if (
     key === "3" &&
-    currentScene === "scene02Choice"
+    currentScene ===
+      "scene02Choice"
   ) {
     selectPronoun("they");
   }
 
-  // V מדמה דיבור
-  if (key === "v" || key === "V") {
+  if (
+    key === "v" ||
+    key === "V"
+  ) {
     if (!audioUnlocked) {
-      unlockAudio("voice scan debug key");
+      unlockAudio(
+        "voice scan debug key",
+      );
     }
 
-    triggerVoiceScanElement("debug key");
+    triggerVoiceScanElement(
+      "debug key",
+    );
   }
 
-  // בדיקת מסך הלופ של Voice Scan
   if (key === "5") {
-    playScene("scene05VoiceLoop");
+    playScene(
+      "scene05VoiceLoop",
+    );
   }
 
-  // בדיקת סרטון התשובה
   if (key === "7") {
-    playScene("scene05ScanVoiceAns");
+    playScene(
+      "scene05ScanVoiceAns",
+    );
   }
 
-  // בדיקת רצף העונות:
-  // קודם הסרטון ואז מסך הבחירה
+  // מתחיל בסרטון העונות ואז עובר למסך הבחירה
   if (key === "6") {
-    playScene("scene06SeasonsIntro");
+    playScene(
+      "scene06SeasonsIntro",
+    );
+  }
+
+  // בדיקות מהירות של בחירת עונות בלי יד
+  if (
+    key === "q" &&
+    currentScene ===
+      "scene06SeasonsChoice"
+  ) {
+    selectSeason("summer");
+  }
+
+  if (
+    key === "w" &&
+    currentScene ===
+      "scene06SeasonsChoice"
+  ) {
+    selectSeason("winter");
+  }
+
+  if (
+    key === "e" &&
+    currentScene ===
+      "scene06SeasonsChoice"
+  ) {
+    selectSeason("spring");
+  }
+
+  if (
+    key === "r" &&
+    currentScene ===
+      "scene06SeasonsChoice"
+  ) {
+    selectSeason("autumn");
   }
 }
 
 function mousePressed() {
   if (!audioUnlocked) {
-    unlockAudio("mouse click");
+    unlockAudio(
+      "mouse click",
+    );
   }
 
-  if (currentScene === "logoLoop") {
-    playScene("logoToScene01");
+  if (
+    currentScene ===
+    "logoLoop"
+  ) {
+    playScene(
+      "logoToScene01",
+    );
   }
 }
 
@@ -2108,8 +3195,13 @@ function touchStarted() {
     unlockAudio("touch");
   }
 
-  if (currentScene === "logoLoop") {
-    playScene("logoToScene01");
+  if (
+    currentScene ===
+    "logoLoop"
+  ) {
+    playScene(
+      "logoToScene01",
+    );
   }
 
   return false;
