@@ -1102,12 +1102,28 @@ function checkVoiceElementEnd() {
     video.el.ended ||
     video.el.currentTime >= video.el.duration - 0.05;
 
-  // ברגע שהאלמנט נגמר — מתחילים לספור דיליי
+  // ברגע שהאלמנט נגמר — עוצרות את הסאונד ומתחילות לספור דיליי
   if (!voiceAnsDelayActive && elementHasEnded) {
+    stopVoiceScanSound();
+
     voiceAnsDelayActive = true;
     voiceAnsDelayStartedAt = millis();
     return;
   }
+
+  // אחרי הדיליי — עוברות לסרטון התשובה
+  if (
+    voiceAnsDelayActive &&
+    millis() - voiceAnsDelayStartedAt >= voiceAnsDelayMs
+  ) {
+    voiceElementPlaying = false;
+
+    // ביטחון כפול: לוודא שהסאונד לא ממשיך לתוך הסרטון הבא
+    stopVoiceScanSound();
+
+    startCrossfade("scene05VoiceLoop", "scene05ScanVoiceAns");
+  }
+}
 
   // אחרי הדיליי — עוברים לסרטון התשובה
   if (
