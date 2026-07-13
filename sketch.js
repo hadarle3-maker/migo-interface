@@ -12,6 +12,7 @@ let videos = {};
 // סאונד חיצוני ל־Voice Scan
 let voiceScanSound;
 const VOICE_SCAN_SOUND_SRC = "assets/sound/sound%20scan.wav";
+const VOICE_SCAN_SOUND_VOLUME = 0.35;
 
 let currentScene = "logoLoop";
 let firstFrameShown = false;
@@ -396,7 +397,7 @@ function loadSounds() {
 
   voiceScanSound.src = VOICE_SCAN_SOUND_SRC;
   voiceScanSound.preload = "auto";
-  voiceScanSound.volume = 1;
+  voiceScanSound.volume = VOICE_SCAN_SOUND_VOLUME;
   voiceScanSound.muted = true;
 
   voiceScanSound.addEventListener("canplaythrough", function () {
@@ -439,7 +440,7 @@ function unlockAudio(reason = "unknown") {
 
   if (voiceScanSound) {
     voiceScanSound.muted = false;
-    voiceScanSound.volume = 1;
+    voiceScanSound.volume = VOICE_SCAN_SOUND_VOLUME;
   }
 
   if (videos[currentScene]) {
