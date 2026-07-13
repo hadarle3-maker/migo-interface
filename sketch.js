@@ -310,25 +310,25 @@ const SEASON_POSITIONS = {
   summer: {
     label: "Summer",
     x: 1359.4389,
-    y: 280,
+    y: 260,
   },
 
   winter: {
     label: "Winter",
     x: 1300.677,
-    y: 530,
+    y: 520,
   },
 
   spring: {
     label: "Spring",
     x: 656.677,
-    y: 175,
+    y: 165,
   },
 
   autumn: {
     label: "Autumn",
     x: 577.3913,
-    y: 417,
+    y: 407,
   },
 };
 
