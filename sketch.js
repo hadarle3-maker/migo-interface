@@ -1,4 +1,4 @@
-console.log("MIGO CLEAN FLOW V05 - QUALITY FIX");
+console.log("MIGO FLOW V06 - SCENE 02 TEXT POSITION TEST");
 
 let W = 1920;
 let H = 1080;
@@ -8,6 +8,13 @@ let videos = {};
 
 let currentScene = "logoLoop";
 let firstFrameShown = false;
+
+// תמונת בדיקה לסצנה 02
+const SCENE02_TEST_IMAGE_SRC = "assets/videos/secen02_back.png";
+let scene02TestBg;
+
+// פונט
+let pronounFont;
 
 // סאונד
 let audioUnlocked = false;
@@ -38,17 +45,16 @@ let closedHoldTime = 250;
 let lastHandGestureTime = 0;
 let gestureCooldown = 1400;
 
+// בדיקת מיקום
+let showPositionDots = true;
+
 const VIDEO_FILES = {
   logoLoop: {
     src: "assets/videos/logo_loop.mp4",
     volume: 1,
     loop: false,
     customLoop: true,
-
-    // אם יש שחור בתחילת הלופ — להעלות ל-0.12 / 0.18
     startAt: 0.08,
-
-    // אם יש שחור או קפיצה בסוף הלופ — להעלות ל-0.12 / 0.18
     endTrim: 0.08
   },
 
@@ -58,8 +64,6 @@ const VIDEO_FILES = {
     loop: false,
     customLoop: false,
     startAt: 0,
-
-    // אם יש שחור בסוף הסרטון לפני המעבר — להעלות ל-0.25 / 0.35
     endTrim: 0.18
   },
 
@@ -68,25 +72,53 @@ const VIDEO_FILES = {
     volume: 1,
     loop: false,
     customLoop: false,
-
-    // אם הסרטון מתחיל בפריים שחור — להעלות ל-0.12 / 0.15
     startAt: 0.08,
+    endTrim: 0.18
+  },
 
-    endTrim: 0
+  scene02Intro: {
+    src: "assets/videos/scene_02.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0.18
+  }
+};
+
+const PRONOUN_POSITIONS = {
+  he: {
+    label: "He",
+    x: 593.5599,
+    y: 511.3138
+  },
+
+  she: {
+    label: "She",
+    x: 1389.5729,
+    y: 538.079
+  },
+
+  they: {
+    label: "They",
+    x: 958.8,
+    y: 253.2852
   }
 };
 
 function preload() {
   handPose = ml5.handPose({ maxHands: 1 });
   faceMesh = ml5.faceMesh({ maxFaces: 1 });
+
+  pronounFont = loadFont("assets/fonts/TheBasics_Corporate-Light.ttf");
+  scene02TestBg = loadImage(SCENE02_TEST_IMAGE_SRC);
 }
 
 function setup() {
-  // איכות גבוהה יותר במסכי Retina / Mac
+  cnv = createCanvas(W, H);
+
   let d = min(window.devicePixelRatio || 1, 2);
   pixelDensity(d);
-
-  cnv = createCanvas(W, H);
 
   document.documentElement.style.margin = "0";
   document.documentElement.style.padding = "0";
@@ -97,8 +129,6 @@ function setup() {
   document.body.style.overflow = "hidden";
   document.body.style.backgroundColor = "black";
 
-  // מסתירים את הקנבס עד שיש פריים ראשון מוכן
-  // כדי שלא יהיה רגע שחור / פייד שחור בהתחלה
   cnv.elt.style.visibility = "hidden";
 
   fitCanvasToWindow();
@@ -220,6 +250,15 @@ function applyAudioState(id, volumeLevel = null) {
 ----------------------------- */
 
 function playScene(id) {
+  // סצנה סטטית / בדיקה
+  if (id === "scene02TextTest") {
+    currentScene = id;
+    isCrossfading = false;
+    activeTransition = null;
+    stopAllVideos();
+    return;
+  }
+
   let video = videos[id];
 
   if (!video) {
@@ -455,9 +494,17 @@ function checkAutoTransition() {
   if (currentScene === "logoToScene01") {
     checkVideoEndForCrossfade("logoToScene01", "scene01");
   }
+
+  if (currentScene === "scene01") {
+    checkVideoEndForCrossfade("scene01", "scene02Intro");
+  }
+
+  if (currentScene === "scene02Intro") {
+    checkVideoEndForCrossfade("scene02Intro", "scene02TextTest");
+  }
 }
 
-function checkVideoEndForCrossfade(fromVideoId, toVideoId) {
+function checkVideoEndForCrossfade(fromVideoId, toSceneId) {
   let fromVideo = videos[fromVideoId].el;
   let fromDef = VIDEO_FILES[fromVideoId];
 
@@ -468,18 +515,17 @@ function checkVideoEndForCrossfade(fromVideoId, toVideoId) {
   let timeLeft = virtualEnd - fromVideo.currentTime;
 
   if (timeLeft <= crossfadeDuration) {
-    startCrossfade(fromVideoId, toVideoId);
+    startCrossfade(fromVideoId, toSceneId);
   }
 }
 
-function startCrossfade(fromVideoId, toVideoId) {
+function startCrossfade(fromVideoId, toSceneId) {
   if (isCrossfading) return;
 
   let fromVideo = videos[fromVideoId];
-  let toVideo = videos[toVideoId];
 
-  if (!fromVideo || !toVideo) {
-    console.log("Missing crossfade video:", fromVideoId, toVideoId);
+  if (!fromVideo) {
+    console.log("Missing crossfade from video:", fromVideoId);
     return;
   }
 
@@ -487,36 +533,42 @@ function startCrossfade(fromVideoId, toVideoId) {
 
   activeTransition = {
     fromVideoId: fromVideoId,
-    toVideoId: toVideoId,
+    toSceneId: toSceneId,
     fadeStartTime: millis()
   };
 
-  toVideo.el.loop = false;
-  applyAudioState(toVideoId, 0);
+  // אם היעד הוא וידאו — מתחילים אותו לפני הפייד
+  if (videos[toSceneId]) {
+    let toVideo = videos[toSceneId];
 
-  try {
-    toVideo.el.currentTime = VIDEO_FILES[toVideoId].startAt || 0;
-  } catch (e) {}
+    toVideo.el.loop = false;
+    applyAudioState(toSceneId, 0);
 
-  toVideo.el.play().catch(function (err) {
-    console.log("PLAY NEXT FAILED:", toVideoId, err);
-  });
+    try {
+      toVideo.el.currentTime = VIDEO_FILES[toSceneId].startAt || 0;
+    } catch (e) {}
+
+    toVideo.el.play().catch(function (err) {
+      console.log("PLAY NEXT FAILED:", toSceneId, err);
+    });
+  }
 }
 
 function finishCrossfade() {
   if (!activeTransition) return;
 
   let fromVideoId = activeTransition.fromVideoId;
-  let toVideoId = activeTransition.toVideoId;
+  let toSceneId = activeTransition.toSceneId;
 
   if (videos[fromVideoId]) {
     videos[fromVideoId].el.pause();
     videos[fromVideoId].el.volume = 0;
   }
 
-  if (videos[toVideoId]) {
-    currentScene = toVideoId;
-    applyAudioState(toVideoId, VIDEO_FILES[toVideoId].volume);
+  currentScene = toSceneId;
+
+  if (videos[toSceneId]) {
+    applyAudioState(toSceneId, VIDEO_FILES[toSceneId].volume);
   }
 
   isCrossfading = false;
@@ -533,6 +585,11 @@ function drawCurrentScene() {
     return;
   }
 
+  if (currentScene === "scene02TextTest") {
+    drawScene02TextTest(1);
+    return;
+  }
+
   drawVideo(currentScene, 1);
 }
 
@@ -540,18 +597,19 @@ function drawCrossfade() {
   if (!activeTransition) return;
 
   let fromVideoId = activeTransition.fromVideoId;
-  let toVideoId = activeTransition.toVideoId;
+  let toSceneId = activeTransition.toSceneId;
 
   let fromVideo = videos[fromVideoId];
-  let toVideo = videos[toVideoId];
 
-  if (!fromVideo || !toVideo) return;
+  if (!fromVideo) return;
 
-  // אם הסרטון הבא עוד לא מוכן,
-  // לא עושים פייד, כדי לא לקבל שחור.
-  if (toVideo.el.readyState < 2) {
-    drawVideo(fromVideoId, 1);
-    return;
+  if (videos[toSceneId]) {
+    let toVideo = videos[toSceneId];
+
+    if (toVideo.el.readyState < 2) {
+      drawVideo(fromVideoId, 1);
+      return;
+    }
   }
 
   let p =
@@ -560,14 +618,19 @@ function drawCrossfade() {
 
   p = constrain(p, 0, 1);
 
-  // קרוס־פייד בלי נפילה לשחור:
-  // הסרטון היוצא נשאר 100%, והנכנס עולה מעליו.
+  // בלי נפילה לשחור:
+  // הסרטון היוצא נשאר 100%, היעד עולה מעליו.
   drawVideo(fromVideoId, 1);
-  drawVideo(toVideoId, p);
 
-  if (audioUnlocked) {
+  if (toSceneId === "scene02TextTest") {
+    drawScene02TextTest(p);
+  } else {
+    drawVideo(toSceneId, p);
+  }
+
+  if (audioUnlocked && videos[toSceneId]) {
     fromVideo.el.volume = VIDEO_FILES[fromVideoId].volume * (1 - p);
-    toVideo.el.volume = VIDEO_FILES[toVideoId].volume * p;
+    videos[toSceneId].el.volume = VIDEO_FILES[toSceneId].volume * p;
   }
 
   if (p >= 1) {
@@ -593,9 +656,99 @@ function drawVideo(id, alpha = 1) {
   }
 }
 
+function drawScene02TextTest(alpha = 1) {
+  drawingContext.save();
+  drawingContext.globalAlpha = alpha;
+
+  if (scene02TestBg) {
+    image(scene02TestBg, 0, 0, W, H);
+  } else {
+    background(0);
+  }
+
+  drawPronounTexts();
+
+  drawingContext.restore();
+}
+
+function drawPronounTexts() {
+  push();
+
+  textFont(pronounFont);
+  textSize(240);
+  textAlign(LEFT, CENTER);
+  noStroke();
+  fill(255, 0, 0);
+
+  drawTrackedCenteredText(
+    PRONOUN_POSITIONS.he.label,
+    PRONOUN_POSITIONS.he.x,
+    PRONOUN_POSITIONS.he.y,
+    -40
+  );
+
+  drawTrackedCenteredText(
+    PRONOUN_POSITIONS.she.label,
+    PRONOUN_POSITIONS.she.x,
+    PRONOUN_POSITIONS.she.y,
+    -40
+  );
+
+  drawTrackedCenteredText(
+    PRONOUN_POSITIONS.they.label,
+    PRONOUN_POSITIONS.they.x,
+    PRONOUN_POSITIONS.they.y,
+    -40
+  );
+
+  if (showPositionDots) {
+    drawPositionDot(PRONOUN_POSITIONS.he.x, PRONOUN_POSITIONS.he.y);
+    drawPositionDot(PRONOUN_POSITIONS.she.x, PRONOUN_POSITIONS.she.y);
+    drawPositionDot(PRONOUN_POSITIONS.they.x, PRONOUN_POSITIONS.they.y);
+  }
+
+  pop();
+}
+
+function drawTrackedCenteredText(txt, centerX, centerY, tracking) {
+  let totalW = getTrackedTextWidth(txt, tracking);
+  let x = centerX - totalW / 2;
+
+  for (let i = 0; i < txt.length; i++) {
+    let ch = txt.charAt(i);
+    text(ch, x, centerY);
+    x += textWidth(ch) + tracking;
+  }
+}
+
+function getTrackedTextWidth(txt, tracking) {
+  let total = 0;
+
+  for (let i = 0; i < txt.length; i++) {
+    total += textWidth(txt.charAt(i));
+
+    if (i < txt.length - 1) {
+      total += tracking;
+    }
+  }
+
+  return total;
+}
+
+function drawPositionDot(x, y) {
+  push();
+  stroke(255, 0, 0);
+  strokeWeight(3);
+  line(x - 18, y, x + 18, y);
+  line(x, y - 18, x, y + 18);
+  noStroke();
+  fill(255, 0, 0);
+  circle(x, y, 8);
+  pop();
+}
+
 /* -----------------------------
    CANVAS FIT — CONTAIN
-   בלי חיתוך של הפריים
 ----------------------------- */
 
 function fitCanvasToWindow() {
@@ -622,6 +775,16 @@ function keyPressed() {
   if (key === " " && currentScene === "logoLoop") {
     unlockAudio("space key");
     playScene("logoToScene01");
+  }
+
+  // קיצור לבדיקה: D מדלג ישר למסך בדיקת מיקומים
+  if (key === "d" || key === "D") {
+    playScene("scene02TextTest");
+  }
+
+  // קיצור לבדיקה: S מדליק/מכבה נקודות עוגן
+  if (key === "s" || key === "S") {
+    showPositionDots = !showPositionDots;
   }
 }
 
