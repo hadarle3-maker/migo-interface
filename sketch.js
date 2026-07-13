@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V16 - VOICE SCAN TO SEASONS");
+console.log("MIGO FLOW V17 - VOICE SCAN ANSWER TO SEASONS");
 
 let W = 1920;
 let H = 1080;
@@ -245,6 +245,15 @@ const VIDEO_FILES = {
     customLoop: false,
     startAt: 0,
     endTrim: 0
+  },
+
+  scene05ScanVoiceAns: {
+    src: "assets/videos/secen_05_scan_voice_ans.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0.18
   },
 
   scene06Seasons: {
@@ -1081,7 +1090,7 @@ function checkVoiceElementEnd() {
 
   if (timeLeft <= crossfadeDuration) {
     voiceElementPlaying = false;
-    startCrossfade("scene05VoiceLoop", "scene06Seasons");
+    startCrossfade("scene05VoiceLoop", "scene05ScanVoiceAns");
   }
 }
 
@@ -1202,6 +1211,10 @@ function checkAutoTransition() {
 
   if (currentScene === "scene05VoiceLoop") {
     checkVoiceElementEnd();
+  }
+
+  if (currentScene === "scene05ScanVoiceAns") {
+    checkVideoEndForCrossfade("scene05ScanVoiceAns", "scene06Seasons");
   }
 }
 
@@ -1728,6 +1741,11 @@ function keyPressed() {
   // קיצור בדיקה למסך הלופ של Voice Scan
   if (key === "5") {
     playScene("scene05VoiceLoop");
+  }
+
+  // קיצור בדיקה לסרטון התשובה שאחרי הסריקה
+  if (key === "7") {
+    playScene("scene05ScanVoiceAns");
   }
 
   // קיצור בדיקה לסצנת העונות
