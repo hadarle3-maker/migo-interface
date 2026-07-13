@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V10 - SCENE 02 PRONOUN SELECTION");
+console.log("MIGO FLOW V11 - SCENE 03 LOVE FACE TRANSITIONS");
 
 let W = 1920;
 let H = 1080;
@@ -160,6 +160,33 @@ const VIDEO_FILES = {
     customLoop: false,
     startAt: 0,
     endTrim: 0
+  },
+
+  scene03SheToLoveFace: {
+    src: "assets/videos/secen_03_she_to_love_face.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
+  },
+
+  scene03HeToLoveFace: {
+    src: "assets/videos/secen_03_he_to_love_face.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
+  },
+
+  scene03TheyToLoveFace: {
+    src: "assets/videos/secen_03_they_to_love_face.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
   }
 };
 
@@ -187,6 +214,12 @@ const PRONOUN_ANSWER_VIDEOS = {
   he: "scene02AnsHe",
   she: "scene02AnsShe",
   they: "scene02AnsThey"
+};
+
+const ANSWER_TO_LOVE_FACE_VIDEOS = {
+  scene02AnsShe: "scene03SheToLoveFace",
+  scene02AnsHe: "scene03HeToLoveFace",
+  scene02AnsThey: "scene03TheyToLoveFace"
 };
 
 function preload() {
@@ -794,6 +827,18 @@ function checkAutoTransition() {
 
   if (currentScene === "scene02Intro") {
     checkVideoEndForCrossfade("scene02Intro", "scene02Choice");
+  }
+
+  if (currentScene === "scene02AnsShe") {
+    checkVideoEndForCrossfade("scene02AnsShe", "scene03SheToLoveFace");
+  }
+
+  if (currentScene === "scene02AnsHe") {
+    checkVideoEndForCrossfade("scene02AnsHe", "scene03HeToLoveFace");
+  }
+
+  if (currentScene === "scene02AnsThey") {
+    checkVideoEndForCrossfade("scene02AnsThey", "scene03TheyToLoveFace");
   }
 }
 
