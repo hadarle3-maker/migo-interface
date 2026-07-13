@@ -1125,15 +1125,6 @@ function checkVoiceElementEnd() {
   }
 }
 
-  // אחרי הדיליי — עוברים לסרטון התשובה
-  if (
-    voiceAnsDelayActive &&
-    millis() - voiceAnsDelayStartedAt >= voiceAnsDelayMs
-  ) {
-    voiceElementPlaying = false;
-    startCrossfade("scene05VoiceLoop", "scene05ScanVoiceAns");
-  }
-}
 
 /* -----------------------------
    HAND STATE
