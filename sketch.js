@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V30 - STABLE MORPH HOLD + FINAL RETURN");
+console.log("MIGO FLOW V31 - PRE-END MORPH FREEZE + FINAL RETURN");
 
 const W = 1920;
 const H = 1080;
@@ -58,6 +58,12 @@ const noTermsReturnDelayMs = 10000;
 // קפוא במשך 2.5 שניות ואז עוברות לסרטון הסופי.
 const morfToFinalDelayMs = 2500;
 const morfToFinalCrossfadeDuration = 0.65;
+
+// לא מחכות לאירוע ended של סרטון ה־morph, כי בחלק מהדפדפנים
+// אלמנט הווידאו עלול להציג שוב את הפריים הראשון ברגע הסיום.
+// במקום זאת שומרות פריימים מהחלק האחרון ועוצרות מעט לפני הסוף.
+const morfCaptureWindowSeconds = 0.4;
+const morfFreezeBeforeEndSeconds = 0.06;
 
 // בסיום הסרטון הסופי חוזרות בצורה חלקה להתחלה.
 const finalToLogoCrossfadeDuration = 0.65;
@@ -2812,48 +2818,88 @@ function checkMorfToFinalFlow() {
     return;
   }
 
-  let morfEnded =
-    morfVideo.el.ended ||
-    morfVideo.el.currentTime >=
-      morfVideo.el.duration -
-        0.05;
-
-  if (
-    !morfWaitingForFinal &&
-    morfEnded
-  ) {
-    // קודם מצלמות את הפריים שמוצג כרגע,
-    // ורק אחר כך עוצרות את הסרטון.
-    // חשוב: לא משנות שוב את currentTime.
-    captureMorfFreezeFrame(
-      currentScene,
-      morfVideo.el,
-    );
-
-    morfVideo.el.pause();
-
-    morfWaitingForFinal = true;
-    morfEndedAt = millis();
-
-    console.log(
-      "MORPH ENDED. HOLDING THE LAST FRAME FOR 2.5 SECONDS.",
-    );
+  // ברגע שכבר הקפאנו את סוף המורף, רק סופרות 2.5 שניות
+  // ואז עוברות ישירות לסרטון הסופי.
+  if (morfWaitingForFinal) {
+    if (
+      millis() -
+        morfEndedAt >=
+        morfToFinalDelayMs
+    ) {
+      startCrossfade(
+        currentScene,
+        "migoFinal",
+        morfToFinalCrossfadeDuration,
+      );
+    }
 
     return;
   }
 
+  let duration =
+    morfVideo.el.duration;
+
+  let currentTime =
+    morfVideo.el.currentTime;
+
+  let timeLeft =
+    duration - currentTime;
+
+  let morfEnded =
+    morfVideo.el.ended;
+
+  // שומרות באופן רציף את הפריים התקין האחרון במהלך החלק
+  // האחרון של הסרטון. הצילום עדיין לא מוצג כל עוד הסרטון מנגן.
   if (
-    morfWaitingForFinal &&
-    millis() -
-      morfEndedAt >=
-      morfToFinalDelayMs
+    !morfEnded &&
+    timeLeft > 0 &&
+    timeLeft <=
+      morfCaptureWindowSeconds
   ) {
-    startCrossfade(
+    captureMorfFreezeFrame(
       currentScene,
-      "migoFinal",
-      morfToFinalCrossfadeDuration,
+      morfVideo.el,
     );
   }
+
+  // עוצרות מעט לפני שהדפדפן מגיע ל־ended.
+  // כך הוא לעולם לא מקבל הזדמנות להציג שוב את הפריים הראשון
+  // של קובץ ה־morph, שבו נמצא מסך ה־Yes / No.
+  let shouldFreezeNow =
+    morfEnded ||
+    timeLeft <=
+      morfFreezeBeforeEndSeconds;
+
+  if (!shouldFreezeNow) {
+    return;
+  }
+
+  // במקרה שהגענו לסוף בקפיצה ולא נשמר עדיין פריים,
+  // מנסות לצלם את הפריים הנוכחי. בדרך כלל כבר קיים צילום תקין
+  // מחלון ה־0.4 שניות שלפני הסיום.
+  if (
+    !morfFreezeReady &&
+    !morfEnded
+  ) {
+    captureMorfFreezeFrame(
+      currentScene,
+      morfVideo.el,
+    );
+  }
+
+  morfVideo.el.pause();
+
+  // משתיקות את אלמנט הווידאו עצמו בזמן שהצילום הקפוא מוצג.
+  morfVideo.el.volume = 0;
+
+  morfWaitingForFinal = true;
+  morfEndedAt = millis();
+
+  console.log(
+    "MORPH FROZEN BEFORE ENDED. PLAYING MIGO FINAL IN 2.5 SECONDS.",
+    "timeLeft:",
+    timeLeft,
+  );
 }
 
 function resetMigoFinalState() {
@@ -4178,7 +4224,18 @@ function drawSceneById(
     ) &&
     morfFreezeReady &&
     morfFreezeSceneId ===
-      sceneId
+      sceneId &&
+    (
+      morfWaitingForFinal ||
+      (
+        isCrossfading &&
+        activeTransition &&
+        activeTransition.fromSceneId ===
+          sceneId &&
+        activeTransition.toSceneId ===
+          "migoFinal"
+      )
+    )
   ) {
     drawFrozenMorfFrame(
       alpha,
