@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V31 - PRE-END MORPH FREEZE + FINAL RETURN");
+console.log("MIGO FLOW V32 - 30 SECOND CHOICE TIMEOUTS");
 
 const W = 1920;
 const H = 1080;
@@ -67,6 +67,11 @@ const morfFreezeBeforeEndSeconds = 0.06;
 
 // בסיום הסרטון הסופי חוזרות בצורה חלקה להתחלה.
 const finalToLogoCrossfadeDuration = 0.65;
+
+// במסכי הבחירה המרכזיים מחכות לתגובה במשך 30 שניות בלבד.
+// אם לא התקבלה בחירה, מאפסות את החוויה וחוזרות ללוגו.
+const choiceScreenTimeoutMs = 30000;
+const choiceTimeoutReturnCrossfadeDuration = 0.65;
 
 // פתיחת אודיו באמצעות זיהוי פנים
 let faceSeenSince = 0;
@@ -187,6 +192,10 @@ let morfFreezeSceneId = null;
 
 // מונע הפעלה כפולה של החזרה להתחלה בסוף הסרטון הסופי.
 let migoFinalReturningToStart = false;
+
+// טיימר חוסר פעילות למסכי He / She / They, בחירת ואישור העונה ו־Yes / No.
+let choiceTimeoutSceneId = null;
+let choiceTimeoutStartedAt = 0;
 
 // העונה שמוצגת כרגע
 let currentSeason = null;
@@ -1460,10 +1469,18 @@ function playScene(id) {
       true,
     );
 
+    updateChoiceTimeoutForScene(
+      id,
+    );
+
     showCanvas();
 
     return;
   }
+
+  updateChoiceTimeoutForScene(
+    id,
+  );
 
   let video = videos[id];
 
@@ -2994,6 +3011,7 @@ function resetExperienceValues() {
   resetNoTermsState();
   resetMorfToFinalState();
   resetMigoFinalState();
+  clearChoiceScreenTimeout();
 }
 
 function getHoveredArrowKey() {
@@ -3633,11 +3651,119 @@ function getHandPoint(
 }
 
 /* -----------------------------
+   CHOICE SCREEN TIMEOUT
+----------------------------- */
+
+function isTimedChoiceScene(
+  sceneId,
+) {
+  return (
+    sceneId ===
+      "scene02Choice" ||
+    sceneId ===
+      "scene06SeasonsChoice" ||
+    isSeasonLoopScene(
+      sceneId,
+    ) ||
+    sceneId ===
+      "scene07YesNoChoice"
+  );
+}
+
+function clearChoiceScreenTimeout() {
+  choiceTimeoutSceneId = null;
+  choiceTimeoutStartedAt = 0;
+}
+
+function updateChoiceTimeoutForScene(
+  sceneId,
+) {
+  if (
+    !isTimedChoiceScene(
+      sceneId,
+    )
+  ) {
+    clearChoiceScreenTimeout();
+
+    return;
+  }
+
+  choiceTimeoutSceneId =
+    sceneId;
+
+  choiceTimeoutStartedAt =
+    millis();
+
+  console.log(
+    "CHOICE TIMEOUT STARTED:",
+    sceneId,
+    "30 seconds",
+  );
+}
+
+function checkChoiceScreenTimeout() {
+  if (
+    !isTimedChoiceScene(
+      currentScene,
+    )
+  ) {
+    return false;
+  }
+
+  // גיבוי למקרה שנכנסנו למסך דרך קיצור בדיקה.
+  if (
+    choiceTimeoutSceneId !==
+      currentScene ||
+    choiceTimeoutStartedAt ===
+      0
+  ) {
+    updateChoiceTimeoutForScene(
+      currentScene,
+    );
+
+    return false;
+  }
+
+  if (
+    millis() -
+      choiceTimeoutStartedAt <
+      choiceScreenTimeoutMs
+  ) {
+    return false;
+  }
+
+  let timedOutScene =
+    currentScene;
+
+  console.log(
+    "CHOICE SCREEN TIMED OUT. RETURNING TO LOGO:",
+    timedOutScene,
+  );
+
+  // מאפסות את כל הבחירות והמחוות לפני החזרה להתחלה.
+  resetExperienceValues();
+
+  startCrossfade(
+    timedOutScene,
+    "logoLoop",
+    choiceTimeoutReturnCrossfadeDuration,
+  );
+
+  return true;
+}
+
+/* -----------------------------
    AUTO TRANSITIONS / CROSSFADE
 ----------------------------- */
 
 function checkAutoTransition() {
   if (isCrossfading) return;
+
+  if (
+    checkChoiceScreenTimeout()
+  ) {
+    return;
+  }
 
   if (
     currentScene ===
@@ -3760,6 +3886,14 @@ function startCrossfade(
     crossfadeDuration,
 ) {
   if (isCrossfading) return;
+
+  if (
+    isTimedChoiceScene(
+      fromSceneId,
+    )
+  ) {
+    clearChoiceScreenTimeout();
+  }
 
   if (
     !videos[fromSceneId] &&
@@ -3931,6 +4065,10 @@ function finishCrossfade() {
   }
 
   currentScene = toSceneId;
+
+  updateChoiceTimeoutForScene(
+    currentScene,
+  );
 
   if (
     isFinalMorfScene(
