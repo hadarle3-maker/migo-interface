@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V28 - R2 AND SMART FINAL VIDEO LOADING");
+console.log("MIGO FLOW V29 - MORPH TO FINAL FILM");
 
 const W = 1920;
 const H = 1080;
@@ -34,6 +34,11 @@ const SCENE_08_QA_TO_TERMS_URL =
   R2_VIDEO_BASE_URL +
   "/%20scene_08_qa_to_terms.mp4";
 
+// הסרטון הסופי המשותף לכל ארבע העונות
+const MIGO_FINAL_URL =
+  R2_VIDEO_BASE_URL +
+  "/migo_final.mp4";
+
 // מעברים
 let isCrossfading = false;
 let activeTransition = null;
@@ -48,6 +53,11 @@ const qaAnswerCrossfadeDuration = 0.5;
 const noTermsToMorfCrossfadeDuration = 0.5;
 const noTermsReturnCrossfadeDuration = 0.65;
 const noTermsReturnDelayMs = 10000;
+
+// לאחר סיום סרטון ה־morph משאירות את הפריים האחרון
+// קפוא במשך 2.5 שניות ואז עוברות לסרטון הסופי.
+const morfToFinalDelayMs = 2500;
+const morfToFinalCrossfadeDuration = 0.65;
 
 // פתיחת אודיו באמצעות זיהוי פנים
 let faceSeenSince = 0;
@@ -155,6 +165,10 @@ let selectedYesNo = null;
 // מצב סרטון ה־No וההמתנה לפני החזרה ללוגו
 let noTermsEndedAt = 0;
 let noTermsWaitingForReturn = false;
+
+// מצב ההמתנה בין סיום ה־morph לסרטון הסופי
+let morfEndedAt = 0;
+let morfWaitingForFinal = false;
 
 // העונה שמוצגת כרגע
 let currentSeason = null;
@@ -691,6 +705,17 @@ const VIDEO_FILES = {
   scene08QaToTerms: {
     src:
       SCENE_08_QA_TO_TERMS_URL,
+    volume: 1,
+    loop: false,
+    startAt: 0,
+    endTrim: 0,
+    preload: "none",
+  },
+
+  // הסרטון הסופי המשותף לכל ארבע העונות
+  migoFinal: {
+    src:
+      MIGO_FINAL_URL,
     volume: 1,
     loop: false,
     startAt: 0,
@@ -2512,6 +2537,14 @@ function playSelectedSeasonMorf(
     reason,
   );
 
+  // הסרטון הסופי כבד ונמצא ב־R2, לכן מתחילות
+  // לטעון אותו בזמן שה־morph מתנגן.
+  requestVideoPreload(
+    "migoFinal",
+  );
+
+  resetMorfToFinalState();
+
   startCrossfade(
     fromSceneId,
     targetVideo,
@@ -2621,6 +2654,92 @@ function checkNoTermsFlow() {
   }
 }
 
+function isFinalMorfScene(
+  sceneId,
+) {
+  return (
+    sceneId ===
+      "scene08SpringMorf" ||
+    sceneId ===
+      "scene08SummerMorf" ||
+    sceneId ===
+      "scene08AutumnMorf" ||
+    sceneId ===
+      "scene08WinterMorf"
+  );
+}
+
+function resetMorfToFinalState() {
+  morfEndedAt = 0;
+  morfWaitingForFinal = false;
+}
+
+function checkMorfToFinalFlow() {
+  if (
+    !isFinalMorfScene(
+      currentScene,
+    )
+  ) {
+    return;
+  }
+
+  let morfVideo =
+    videos[currentScene];
+
+  if (
+    !morfVideo ||
+    !morfVideo.el.duration
+  ) {
+    return;
+  }
+
+  let morfEnded =
+    morfVideo.el.ended ||
+    morfVideo.el.currentTime >=
+      morfVideo.el.duration -
+        0.05;
+
+  if (
+    !morfWaitingForFinal &&
+    morfEnded
+  ) {
+    morfWaitingForFinal = true;
+    morfEndedAt = millis();
+
+    // משאירות את הפריים האחרון של ה־morph קפוא
+    // בזמן ההמתנה לפני הסרטון הסופי.
+    morfVideo.el.pause();
+
+    try {
+      morfVideo.el.currentTime =
+        max(
+          0,
+          morfVideo.el.duration -
+            0.03,
+        );
+    } catch (e) {}
+
+    console.log(
+      "MORPH ENDED. PLAYING MIGO FINAL IN 2.5 SECONDS.",
+    );
+
+    return;
+  }
+
+  if (
+    morfWaitingForFinal &&
+    millis() -
+      morfEndedAt >=
+      morfToFinalDelayMs
+  ) {
+    startCrossfade(
+      currentScene,
+      "migoFinal",
+      morfToFinalCrossfadeDuration,
+    );
+  }
+}
+
 function resetExperienceValues() {
   currentSeason = null;
   selectedSeason = null;
@@ -2658,6 +2777,7 @@ function resetExperienceValues() {
   );
 
   resetNoTermsState();
+  resetMorfToFinalState();
 }
 
 function getHoveredArrowKey() {
@@ -3322,6 +3442,16 @@ function checkAutoTransition() {
   }
 
   if (
+    isFinalMorfScene(
+      currentScene,
+    )
+  ) {
+    checkMorfToFinalFlow();
+
+    return;
+  }
+
+  if (
     SEASON_FADE_OUT_TO_KEY[
       currentScene
     ] &&
@@ -3516,10 +3646,19 @@ function isTransitionTargetReady(
   }
 
   if (videos[toSceneId]) {
+    // לסרטונים כבדים שמסומנים preload: none מחכות
+    // לפחות לפריים אחד זמין לפני תחילת המעבר.
+    let requiredReadyState =
+      VIDEO_FILES[toSceneId]
+        .preload === "none"
+        ? 2
+        : 1;
+
     return (
       videos[
         toSceneId
-      ].el.readyState > 0
+      ].el.readyState >=
+      requiredReadyState
     );
   }
 
@@ -3567,6 +3706,28 @@ function finishCrossfade() {
   }
 
   currentScene = toSceneId;
+
+  if (
+    isFinalMorfScene(
+      currentScene,
+    )
+  ) {
+    resetMorfToFinalState();
+
+    // גיבוי: גם אם נכנסנו ל־morph דרך קיצור בדיקה,
+    // הסרטון הסופי מתחיל להיטען מיד.
+    requestVideoPreload(
+      "migoFinal",
+    );
+  }
+
+  if (
+    isFinalMorfScene(
+      fromSceneId,
+    )
+  ) {
+    resetMorfToFinalState();
+  }
 
   let arrivedSeason =
     SEASON_LOOP_TO_KEY[
@@ -4775,6 +4936,17 @@ function keyPressed() {
       "scene08QaToTerms"
   ) {
     switchNoToSelectedMorf();
+  }
+
+  // מעבר ישיר לסרטון הסופי לצורך בדיקה
+  if (key === "0") {
+    requestVideoPreload(
+      "migoFinal",
+    );
+
+    playScene(
+      "migoFinal",
+    );
   }
 }
 
