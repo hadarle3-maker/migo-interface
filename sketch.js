@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V12 - VOICE SCAN MOUTH MOVEMENT");
+console.log("MIGO FLOW V13 - VOICE SCAN WITH SOUND");
 
 let W = 1920;
 let H = 1080;
@@ -9,13 +9,17 @@ let CAM_H = 360;
 let cnv;
 let videos = {};
 
+// סאונד חיצוני ל־Voice Scan
+let voiceScanSound;
+const VOICE_SCAN_SOUND_SRC = "assets/sound/sound%20scan.wav";
+
 let currentScene = "logoLoop";
 let firstFrameShown = false;
 
 // פונט
 let pronounFont;
 
-// סאונד
+// סאונד כללי
 let audioUnlocked = false;
 
 // מעבר
@@ -294,6 +298,7 @@ function setup() {
   fitCanvasToWindow();
 
   loadVideos();
+  loadSounds();
   setupCamera();
 
   playScene("logoLoop");
@@ -357,6 +362,33 @@ function createVideoElement(id, src) {
 }
 
 /* -----------------------------
+   SOUND LOADING
+----------------------------- */
+
+function loadSounds() {
+  voiceScanSound = document.createElement("audio");
+
+  voiceScanSound.src = VOICE_SCAN_SOUND_SRC;
+  voiceScanSound.preload = "auto";
+  voiceScanSound.volume = 1;
+  voiceScanSound.muted = true;
+
+  voiceScanSound.addEventListener("canplaythrough", function () {
+    console.log("VOICE SCAN SOUND READY:", VOICE_SCAN_SOUND_SRC);
+  });
+
+  voiceScanSound.addEventListener("error", function () {
+    console.log(
+      "VOICE SCAN SOUND ERROR:",
+      VOICE_SCAN_SOUND_SRC,
+      voiceScanSound.error
+    );
+  });
+
+  voiceScanSound.load();
+}
+
+/* -----------------------------
    AUDIO
 ----------------------------- */
 
@@ -377,6 +409,11 @@ function unlockAudio(reason = "unknown") {
     } else {
       video.el.volume = 0;
     }
+  }
+
+  if (voiceScanSound) {
+    voiceScanSound.muted = false;
+    voiceScanSound.volume = 1;
   }
 
   if (videos[currentScene]) {
@@ -405,6 +442,30 @@ function applyAudioState(id, volumeLevel = null) {
   }
 }
 
+function playVoiceScanSound() {
+  if (!voiceScanSound) return;
+
+  try {
+    voiceScanSound.pause();
+    voiceScanSound.currentTime = 0;
+    voiceScanSound.volume = 1;
+    voiceScanSound.muted = !audioUnlocked;
+  } catch (e) {}
+
+  voiceScanSound.play().catch(function (err) {
+    console.log("VOICE SCAN SOUND PLAY FAILED:", err);
+  });
+}
+
+function stopVoiceScanSound() {
+  if (!voiceScanSound) return;
+
+  try {
+    voiceScanSound.pause();
+    voiceScanSound.currentTime = 0;
+  } catch (e) {}
+}
+
 /* -----------------------------
    PLAYBACK
 ----------------------------- */
@@ -417,6 +478,7 @@ function playScene(id) {
 
     resetChoiceGesture();
     stopAllVideos();
+    stopVoiceScanSound();
     startScene02ChoiceVideos(true);
 
     if (!firstFrameShown) {
@@ -433,6 +495,7 @@ function playScene(id) {
     activeTransition = null;
 
     stopAllVideos();
+    stopVoiceScanSound();
     startScene05VoiceLoopVideos(true);
 
     if (!firstFrameShown) {
@@ -449,6 +512,7 @@ function playScene(id) {
     activeTransition = null;
 
     stopAllVideos();
+    stopVoiceScanSound();
 
     if (!firstFrameShown) {
       cnv.elt.style.visibility = "visible";
@@ -470,6 +534,7 @@ function playScene(id) {
   activeTransition = null;
 
   stopAllVideos();
+  stopVoiceScanSound();
 
   video.el.loop = false;
   applyAudioState(id);
@@ -509,6 +574,7 @@ function stopScene05VoiceLoopVideos() {
   stopSingleVideo("scene05ScanVoiceBackground");
   stopSingleVideo("scene05ScanVoiceElement");
   stopSingleVideo("scene05ScanVoiceBlob");
+  stopVoiceScanSound();
   resetVoiceScanState();
 }
 
@@ -956,6 +1022,8 @@ function triggerVoiceScanElement(reason = "unknown") {
   try {
     video.el.currentTime = 0;
   } catch (e) {}
+
+  playVoiceScanSound();
 
   video.el.play().catch(function (err) {
     console.log("VOICE ELEMENT PLAY FAILED:", err);
