@@ -1,4 +1,4 @@
-console.log("MIGO CLEAN FLOW V03 - FACE AUDIO + REAL CROSSFADE");
+console.log("MIGO CLEAN FLOW V04 - NO BLACK FADE");
 
 let W = 1920;
 let H = 1080;
@@ -7,14 +7,14 @@ let cnv;
 let videos = {};
 
 let currentScene = "logoLoop";
+let firstFrameShown = false;
 
 // סאונד
 let audioUnlocked = false;
 
-// קרוס פייד
+// מעבר
 let isCrossfading = false;
-let crossfadeDuration = 0.9;
-let crossfadeLead = 0.65;
+let crossfadeDuration = 0.65;
 let activeTransition = null;
 
 // מצלמה / ידיים / פנים
@@ -29,6 +29,7 @@ let faces = [];
 let faceSeenSince = 0;
 let faceHoldToUnlockAudio = 250;
 
+// מחוות יד
 let gesturePhase = "waitingOpen";
 let openSince = 0;
 let closedSince = 0;
@@ -41,22 +42,37 @@ const VIDEO_FILES = {
   logoLoop: {
     src: "assets/videos/logo_loop.mp4",
     volume: 1,
-    loop: true,
-    startAt: 0
+    loop: false,
+    customLoop: true,
+
+    // אם עדיין יש שחור ממש בהתחלה, תעלי ל-0.12 או 0.18
+    startAt: 0.08,
+
+    // אם יש קפיצה/שחור בסוף הלופ, תעלי ל-0.12 או 0.18
+    endTrim: 0.08
   },
 
   logoToScene01: {
     src: "assets/videos/logo_to_secen_01.mp4",
     volume: 1,
     loop: false,
-    startAt: 0
+    customLoop: false,
+    startAt: 0,
+
+    // אם יש שחור בסוף הסרטון הזה לפני המעבר, תעלי ל-0.25 / 0.4
+    endTrim: 0.18
   },
 
   scene01: {
     src: "assets/videos/secen_01.mp4",
     volume: 1,
     loop: false,
-    startAt: 0
+    customLoop: false,
+
+    // אם הסרטון הזה מתחיל בפריים שחור, תעלי ל-0.1 / 0.15
+    startAt: 0.08,
+
+    endTrim: 0
   }
 };
 
@@ -68,12 +84,21 @@ function preload() {
 function setup() {
   cnv = createCanvas(W, H);
   pixelDensity(1);
+
+  document.body.style.margin = "0";
+  document.body.style.overflow = "hidden";
+  document.body.style.backgroundColor = "black";
+
+  // מסתירים את הקנבס עד שהפריים הראשון מוכן.
+  // זה מונע את הפייד/רגע שחור בתחילת האתר.
+  cnv.elt.style.visibility = "hidden";
+
   fitCanvasToWindow();
 
   loadVideos();
   setupCamera();
 
-  playScene("logoLoop", true);
+  playScene("logoLoop");
 }
 
 function draw() {
@@ -83,6 +108,7 @@ function draw() {
   drawingContext.imageSmoothingQuality = "high";
 
   updateInteraction();
+  checkManualLoop();
   checkAutoTransition();
   drawCurrentScene();
 }
@@ -185,7 +211,7 @@ function applyAudioState(id, volumeLevel = null) {
    PLAYBACK
 ----------------------------- */
 
-function playScene(id, loopIt = false) {
+function playScene(id) {
   let video = videos[id];
 
   if (!video) {
@@ -199,7 +225,7 @@ function playScene(id, loopIt = false) {
 
   stopAllVideos();
 
-  video.el.loop = loopIt;
+  video.el.loop = false;
   applyAudioState(id);
 
   try {
@@ -216,8 +242,32 @@ function stopAllVideos() {
     videos[id].el.pause();
 
     try {
-      videos[id].currentTime = 0;
+      videos[id].el.currentTime = VIDEO_FILES[id].startAt || 0;
     } catch (e) {}
+  }
+}
+
+function checkManualLoop() {
+  let def = VIDEO_FILES[currentScene];
+
+  if (!def || !def.customLoop) return;
+
+  let video = videos[currentScene].el;
+
+  if (!video.duration) return;
+
+  let loopStart = def.startAt || 0;
+  let endTrim = def.endTrim || 0;
+  let virtualEnd = video.duration - endTrim;
+
+  if (video.currentTime >= virtualEnd) {
+    try {
+      video.currentTime = loopStart;
+    } catch (e) {}
+
+    video.play().catch(function (err) {
+      console.log("MANUAL LOOP PLAY FAILED:", currentScene, err);
+    });
   }
 }
 
@@ -315,7 +365,7 @@ function detectOpenCloseHandToContinue() {
         openSince = 0;
         closedSince = 0;
 
-        playScene("logoToScene01", false);
+        playScene("logoToScene01");
       }
     } else {
       closedSince = 0;
@@ -400,13 +450,16 @@ function checkAutoTransition() {
 }
 
 function checkVideoEndForCrossfade(fromVideoId, toVideoId) {
-  let video = videos[fromVideoId].el;
+  let fromVideo = videos[fromVideoId].el;
+  let fromDef = VIDEO_FILES[fromVideoId];
 
-  if (!video.duration) return;
+  if (!fromVideo.duration) return;
 
-  let timeLeft = video.duration - video.currentTime;
+  let endTrim = fromDef.endTrim || 0;
+  let virtualEnd = fromVideo.duration - endTrim;
+  let timeLeft = virtualEnd - fromVideo.currentTime;
 
-  if (timeLeft <= crossfadeDuration + crossfadeLead) {
+  if (timeLeft <= crossfadeDuration) {
     startCrossfade(fromVideoId, toVideoId);
   }
 }
@@ -427,11 +480,10 @@ function startCrossfade(fromVideoId, toVideoId) {
   activeTransition = {
     fromVideoId: fromVideoId,
     toVideoId: toVideoId,
-    fadeStarted: false,
-    fadeStartTime: 0
+    fadeStartTime: millis()
   };
 
-  toVideo.el.loop = VIDEO_FILES[toVideoId].loop;
+  toVideo.el.loop = false;
   applyAudioState(toVideoId, 0);
 
   try {
@@ -487,29 +539,27 @@ function drawCrossfade() {
 
   if (!fromVideo || !toVideo) return;
 
-  // כל עוד הסרטון הבא עוד לא באמת מוכן,
-  // ממשיכים להציג את הסרטון הנוכחי ב-100%.
-  // זה מונע פייד לשחור.
+  // אם הסרטון הבא עוד לא מוכן, לא עושים פייד בכלל.
+  // ממשיכים להראות את הסרטון הקודם 100%, כדי שלא יהיה שחור.
   if (toVideo.el.readyState < 2) {
     drawVideo(fromVideoId, 1);
     return;
   }
 
-  if (!activeTransition.fadeStarted) {
-    activeTransition.fadeStarted = true;
-    activeTransition.fadeStartTime = millis();
-  }
-
   let p = (millis() - activeTransition.fadeStartTime) / (crossfadeDuration * 1000);
   p = constrain(p, 0, 1);
+
+  // תיקון חשוב:
+  // לא מציירים את הסרטון היוצא באלפא נמוכה מעל שחור,
+  // כי זה יוצר דימום לשחור.
+  // מציירים את היוצא מלא, ואת הנכנס מעליו.
+  drawVideo(fromVideoId, 1);
+  drawVideo(toVideoId, p);
 
   if (audioUnlocked) {
     fromVideo.el.volume = VIDEO_FILES[fromVideoId].volume * (1 - p);
     toVideo.el.volume = VIDEO_FILES[toVideoId].volume * p;
   }
-
-  drawVideo(fromVideoId, 1 - p);
-  drawVideo(toVideoId, p);
 
   if (p >= 1) {
     finishCrossfade();
@@ -522,6 +572,11 @@ function drawVideo(id, alpha = 1) {
   if (!video) return;
 
   if (video.el.readyState > 0) {
+    if (!firstFrameShown && id === "logoLoop") {
+      cnv.elt.style.visibility = "visible";
+      firstFrameShown = true;
+    }
+
     drawingContext.save();
     drawingContext.globalAlpha = alpha;
     drawingContext.drawImage(video.el, 0, 0, W, H);
@@ -553,22 +608,20 @@ function windowResized() {
    DEBUG
 ----------------------------- */
 
-// רווח לבדיקה מהירה במקום סגירת יד
 function keyPressed() {
   if (key === " " && currentScene === "logoLoop") {
     unlockAudio("space key");
-    playScene("logoToScene01", false);
+    playScene("logoToScene01");
   }
 }
 
-// קליק לבדיקה מהירה וגם לפתיחת סאונד אם הדפדפן חוסם
 function mousePressed() {
   if (!audioUnlocked) {
     unlockAudio("mouse click");
   }
 
   if (currentScene === "logoLoop") {
-    playScene("logoToScene01", false);
+    playScene("logoToScene01");
   }
 }
 
@@ -578,7 +631,7 @@ function touchStarted() {
   }
 
   if (currentScene === "logoLoop") {
-    playScene("logoToScene01", false);
+    playScene("logoToScene01");
   }
 
   return false;
