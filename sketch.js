@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V18 - VOICE SCAN ANSWER DELAY TO SEASONS");
+console.log("MIGO FLOW V19 - VOICE SCAN CALIBRATED MOUTH DETECTION");
 
 let W = 1920;
 let H = 1080;
@@ -96,17 +96,23 @@ let voiceAnsDelayActive = false;
 let voiceAnsDelayStartedAt = 0;
 let voiceAnsDelayMs = 650;
 
+// זיהוי פה
 let mouthPrevRatio = null;
 let mouthBaselineRatio = null;
 let mouthActivityFrames = 0;
 let mouthDebugCounter = 0;
 
-// רגישות זיהוי פה — גרסה רגישה יותר
-let mouthOpenThreshold = 0.035;
-let mouthMovementDeltaThreshold = 0.0025;
-let mouthOpenAboveBaselineThreshold = 0.007;
-let mouthActivityFramesNeeded = 3;
-let voiceDetectionDelay = 1200;
+// כיול שקט לפני זיהוי דיבור
+let mouthCalibrationStartedAt = 0;
+let mouthCalibrationDuration = 1600;
+let mouthCalibrationSamples = [];
+let mouthCalibrationDone = false;
+
+// רגישות זיהוי פה — גרסה שלא אמורה לקפוץ לבד
+let mouthMovementDeltaThreshold = 0.006;
+let mouthOpenAboveBaselineThreshold = 0.018;
+let mouthActivityFramesNeeded = 7;
+let voiceDetectionDelay = 500;
 
 const VIDEO_FILES = {
   logoLoop: {
@@ -954,17 +960,26 @@ function resetVoiceScanState() {
   mouthBaselineRatio = null;
   mouthActivityFrames = 0;
   mouthDebugCounter = 0;
+
+  mouthCalibrationStartedAt = 0;
+  mouthCalibrationSamples = [];
+  mouthCalibrationDone = false;
 }
 
 function detectMouthMovementForVoiceScan() {
   if (voiceElementTriggered) return;
 
+  // השהייה קצרה כדי שהמסך והמצלמה יתייצבו
   if (millis() - voiceLoopEnteredAt < voiceDetectionDelay) return;
 
   if (faces.length === 0) {
     mouthPrevRatio = null;
     mouthBaselineRatio = null;
     mouthActivityFrames = 0;
+
+    mouthCalibrationStartedAt = 0;
+    mouthCalibrationSamples = [];
+    mouthCalibrationDone = false;
     return;
   }
 
@@ -975,49 +990,81 @@ function detectMouthMovementForVoiceScan() {
     mouthPrevRatio = null;
     mouthBaselineRatio = null;
     mouthActivityFrames = 0;
+
+    mouthCalibrationStartedAt = 0;
+    mouthCalibrationSamples = [];
+    mouthCalibrationDone = false;
     return;
   }
 
-  // פריים ראשון — קובעים מצב בסיס
-  if (mouthPrevRatio === null || mouthBaselineRatio === null) {
-    mouthPrevRatio = ratio;
-    mouthBaselineRatio = ratio;
-    mouthActivityFrames = 0;
+  // שלב 1 — כיול שקט.
+  // בזמן הזה לא מפעילים כלום, רק לומדים מה מצב הפה הרגיל.
+  if (!mouthCalibrationDone) {
+    if (mouthCalibrationStartedAt === 0) {
+      mouthCalibrationStartedAt = millis();
+      mouthCalibrationSamples = [];
+      console.log("MOUTH CALIBRATION STARTED");
+    }
+
+    mouthCalibrationSamples.push(ratio);
+
+    if (millis() - mouthCalibrationStartedAt >= mouthCalibrationDuration) {
+      let sum = 0;
+
+      for (let i = 0; i < mouthCalibrationSamples.length; i++) {
+        sum += mouthCalibrationSamples[i];
+      }
+
+      mouthBaselineRatio = sum / mouthCalibrationSamples.length;
+      mouthPrevRatio = ratio;
+      mouthActivityFrames = 0;
+      mouthCalibrationDone = true;
+
+      console.log("MOUTH CALIBRATION DONE. baseline:", mouthBaselineRatio);
+    }
+
     return;
   }
 
+  // שלב 2 — זיהוי דיבור אמיתי
   let movement = abs(ratio - mouthPrevRatio);
   let openAboveBaseline = ratio - mouthBaselineRatio;
 
-  // גרסה רגישה יותר:
-  // מזהה גם תנועה קטנה וגם פתיחה קטנה מעל מצב הבסיס
+  // כדי שלא יופעל מרעידות קטנות:
+  // דורשות גם פתיחה מעל הבייסליין וגם תנועה ברורה / פתיחה משמעותית.
   let mouthLooksActive =
-    openAboveBaseline > mouthOpenAboveBaselineThreshold ||
-    movement > mouthMovementDeltaThreshold;
+    openAboveBaseline > mouthOpenAboveBaselineThreshold &&
+    (
+      movement > mouthMovementDeltaThreshold ||
+      openAboveBaseline > mouthOpenAboveBaselineThreshold * 1.6
+    );
 
   if (mouthLooksActive) {
     mouthActivityFrames++;
   } else {
     mouthActivityFrames = max(0, mouthActivityFrames - 1);
 
-    // מעדכן את הבייסליין רק כשהפה רגוע
-    mouthBaselineRatio = lerp(mouthBaselineRatio, ratio, 0.05);
+    // כשהפה רגוע, מעדכנות ממש בעדינות את הבייסליין
+    mouthBaselineRatio = lerp(mouthBaselineRatio, ratio, 0.01);
   }
 
   mouthPrevRatio = ratio;
 
-  console.log(
-    "mouth ratio:",
-    ratio.toFixed(4),
-    "movement:",
-    movement.toFixed(4),
-    "baseline:",
-    mouthBaselineRatio.toFixed(4),
-    "above:",
-    openAboveBaseline.toFixed(4),
-    "frames:",
-    mouthActivityFrames
-  );
+  mouthDebugCounter++;
+  if (mouthDebugCounter % 8 === 0) {
+    console.log(
+      "mouth ratio:",
+      ratio.toFixed(4),
+      "baseline:",
+      mouthBaselineRatio.toFixed(4),
+      "above:",
+      openAboveBaseline.toFixed(4),
+      "movement:",
+      movement.toFixed(4),
+      "frames:",
+      mouthActivityFrames
+    );
+  }
 
   if (mouthActivityFrames >= mouthActivityFramesNeeded) {
     triggerVoiceScanElement("mouth movement");
@@ -1079,7 +1126,12 @@ function triggerVoiceScanElement(reason = "unknown") {
   voiceAnsDelayStartedAt = 0;
 
   video.el.loop = false;
-  applyAudioState("scene05ScanVoiceElement", 0);
+
+  // משאירות את ה־webm עצמו מושתק לגמרי.
+  // הסאונד החיצוני מגיע רק מ־sound_scan.mp3.
+  video.el.muted = true;
+  video.el.setAttribute("muted", "");
+  video.el.volume = 0;
 
   try {
     video.el.currentTime = 0;
@@ -1096,7 +1148,7 @@ function checkVoiceElementEnd() {
   if (!voiceElementPlaying) return;
 
   let video = videos.scene05ScanVoiceElement;
-  if (!video || !video.el.duration) return;
+  if (!video || !video.el || !video.el.duration) return;
 
   let elementHasEnded =
     video.el.ended ||
@@ -1117,14 +1169,13 @@ function checkVoiceElementEnd() {
     millis() - voiceAnsDelayStartedAt >= voiceAnsDelayMs
   ) {
     voiceElementPlaying = false;
+    voiceElementActive = false;
 
-    // ביטחון כפול: לוודא שהסאונד לא ממשיך לתוך הסרטון הבא
     stopVoiceScanSound();
 
     startCrossfade("scene05VoiceLoop", "scene05ScanVoiceAns");
   }
 }
-
 
 /* -----------------------------
    HAND STATE
