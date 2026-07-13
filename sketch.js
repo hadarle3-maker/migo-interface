@@ -475,7 +475,7 @@ function playVoiceScanSound() {
   try {
     voiceScanSound.pause();
     voiceScanSound.currentTime = 0;
-    voiceScanSound.volume = 1;
+    voiceScanSound.volume = VOICE_SCAN_SOUND_VOLUME;
     voiceScanSound.muted = !audioUnlocked;
   } catch (e) {}
 
