@@ -106,13 +106,13 @@ const YES_NO_POSITIONS = {
   yes: {
     label: "Yes",
     x: 697.3912,
-    y: 257,
+    y: 227,
   },
 
   no: {
     label: "No",
     x: 1216.677,
-    y: 512,
+    y: 482,
   },
 };
 
