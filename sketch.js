@@ -83,6 +83,13 @@ const SEASON_ORDER = [
   "winter",
 ];
 
+const SEASON_DISPLAY_NAMES = {
+  spring: "Spring",
+  summer: "Summer",
+  autumn: "Autumn",
+  winter: "Winter",
+};
+
 // העונה שמוצגת כרגע
 let currentSeason = null;
 
@@ -3357,12 +3364,29 @@ function drawSuccessScreen(
     CENTER
   );
 
-  textSize(120);
+  if (pronounFont) {
+    textFont(pronounFont);
+  }
+
+  textSize(70);
 
   text(
-    "sucsses",
+    "Your final season is",
     W / 2,
-    H / 2
+    H / 2 - 80
+  );
+
+  textSize(150);
+
+  let seasonName =
+    selectedSeason
+      ? SEASON_DISPLAY_NAMES[selectedSeason]
+      : "No season selected";
+
+  text(
+    seasonName,
+    W / 2,
+    H / 2 + 70
   );
 
   pop();
