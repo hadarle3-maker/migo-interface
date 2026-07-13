@@ -1,4 +1,4 @@
-console.log("MIGO CLEAN FLOW V04 - NO BLACK FADE");
+console.log("MIGO CLEAN FLOW V05 - QUALITY FIX");
 
 let W = 1920;
 let H = 1080;
@@ -45,10 +45,10 @@ const VIDEO_FILES = {
     loop: false,
     customLoop: true,
 
-    // אם עדיין יש שחור ממש בהתחלה, תעלי ל-0.12 או 0.18
+    // אם יש שחור בתחילת הלופ — להעלות ל-0.12 / 0.18
     startAt: 0.08,
 
-    // אם יש קפיצה/שחור בסוף הלופ, תעלי ל-0.12 או 0.18
+    // אם יש שחור או קפיצה בסוף הלופ — להעלות ל-0.12 / 0.18
     endTrim: 0.08
   },
 
@@ -59,7 +59,7 @@ const VIDEO_FILES = {
     customLoop: false,
     startAt: 0,
 
-    // אם יש שחור בסוף הסרטון הזה לפני המעבר, תעלי ל-0.25 / 0.4
+    // אם יש שחור בסוף הסרטון לפני המעבר — להעלות ל-0.25 / 0.35
     endTrim: 0.18
   },
 
@@ -69,7 +69,7 @@ const VIDEO_FILES = {
     loop: false,
     customLoop: false,
 
-    // אם הסרטון הזה מתחיל בפריים שחור, תעלי ל-0.1 / 0.15
+    // אם הסרטון מתחיל בפריים שחור — להעלות ל-0.12 / 0.15
     startAt: 0.08,
 
     endTrim: 0
@@ -82,15 +82,23 @@ function preload() {
 }
 
 function setup() {
-  cnv = createCanvas(W, H);
-  pixelDensity(1);
+  // איכות גבוהה יותר במסכי Retina / Mac
+  let d = min(window.devicePixelRatio || 1, 2);
+  pixelDensity(d);
 
+  cnv = createCanvas(W, H);
+
+  document.documentElement.style.margin = "0";
+  document.documentElement.style.padding = "0";
   document.documentElement.style.backgroundColor = "black";
+
   document.body.style.margin = "0";
   document.body.style.padding = "0";
   document.body.style.overflow = "hidden";
   document.body.style.backgroundColor = "black";
 
+  // מסתירים את הקנבס עד שיש פריים ראשון מוכן
+  // כדי שלא יהיה רגע שחור / פייד שחור בהתחלה
   cnv.elt.style.visibility = "hidden";
 
   fitCanvasToWindow();
@@ -539,20 +547,21 @@ function drawCrossfade() {
 
   if (!fromVideo || !toVideo) return;
 
-  // אם הסרטון הבא עוד לא מוכן, לא עושים פייד בכלל.
-  // ממשיכים להראות את הסרטון הקודם 100%, כדי שלא יהיה שחור.
+  // אם הסרטון הבא עוד לא מוכן,
+  // לא עושים פייד, כדי לא לקבל שחור.
   if (toVideo.el.readyState < 2) {
     drawVideo(fromVideoId, 1);
     return;
   }
 
-  let p = (millis() - activeTransition.fadeStartTime) / (crossfadeDuration * 1000);
+  let p =
+    (millis() - activeTransition.fadeStartTime) /
+    (crossfadeDuration * 1000);
+
   p = constrain(p, 0, 1);
 
-  // תיקון חשוב:
-  // לא מציירים את הסרטון היוצא באלפא נמוכה מעל שחור,
-  // כי זה יוצר דימום לשחור.
-  // מציירים את היוצא מלא, ואת הנכנס מעליו.
+  // קרוס־פייד בלי נפילה לשחור:
+  // הסרטון היוצא נשאר 100%, והנכנס עולה מעליו.
   drawVideo(fromVideoId, 1);
   drawVideo(toVideoId, p);
 
@@ -585,7 +594,8 @@ function drawVideo(id, alpha = 1) {
 }
 
 /* -----------------------------
-   CANVAS FIT
+   CANVAS FIT — CONTAIN
+   בלי חיתוך של הפריים
 ----------------------------- */
 
 function fitCanvasToWindow() {
