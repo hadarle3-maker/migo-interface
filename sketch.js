@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V25 - SEASONS TO QA CHOICE");
+console.log("MIGO FLOW V26 - QA BACKGROUND TEXT AND LOOP");
 
 const W = 1920;
 const H = 1080;
@@ -14,7 +14,6 @@ let hands = [];
 let faces = [];
 let pronounFont;
 let arrowImage;
-let yesNoImage;
 
 let currentScene = "logoLoop";
 let firstFrameShown = false;
@@ -99,8 +98,8 @@ const yesNoBaseSize = 240;
 const yesNoHoverScale = 1.3;
 const yesNoTracking = -10;
 
-// אדום זמני לצורך כיוון המיקומים
-const yesNoColor = [255, 0, 0, 255];
+// אותו צבע ואותו אופסיטי כמו They ושאר טקסטי הבחירה
+const yesNoColor = [168, 161, 225, 71];
 
 const YES_NO_POSITIONS = {
   yes: {
@@ -540,6 +539,23 @@ const VIDEO_FILES = {
     startAt: 0,
     endTrim: 0,
   },
+
+  // מסך בחירת Yes / No — רקע, טקסטים ולופ מעל
+  scene07QaBackground: {
+    src: "assets/videos/secen_07_qa_background.mp4",
+    volume: 0,
+    loop: true,
+    startAt: 0,
+    endTrim: 0,
+  },
+
+  scene07QaLoop: {
+    src: "assets/videos/secen 07 qa_loop.webm",
+    volume: 0,
+    loop: true,
+    startAt: 0,
+    endTrim: 0,
+  },
 };
 
 const PRONOUN_POSITIONS = {
@@ -769,10 +785,6 @@ function preload() {
 
   arrowImage = loadImage(
     "assets/videos/arrow.png",
-  );
-
-  yesNoImage = loadImage(
-    "assets/videos/yes_or_no_loop.png",
   );
 }
 
@@ -1176,14 +1188,25 @@ function startSpecialScene(
   }
 
   if (
-    id === "scene07YesNoChoice" &&
-    resetToStart
+    id === "scene07YesNoChoice"
   ) {
-    selectedYesNo = null;
-
-    resetChoiceGesture(
-      yesNoGesture,
+    startLayerLoopVideo(
+      "scene07QaBackground",
+      resetToStart,
     );
+
+    startLayerLoopVideo(
+      "scene07QaLoop",
+      resetToStart,
+    );
+
+    if (resetToStart) {
+      selectedYesNo = null;
+
+      resetChoiceGesture(
+        yesNoGesture,
+      );
+    }
   }
 }
 
@@ -1224,6 +1247,18 @@ function stopSpecialScene(id) {
 
     stopSingleVideo(
       "scene06SeasonsBlobLoop",
+    );
+  }
+
+  if (
+    id === "scene07YesNoChoice"
+  ) {
+    stopSingleVideo(
+      "scene07QaBackground",
+    );
+
+    stopSingleVideo(
+      "scene07QaLoop",
     );
   }
 }
@@ -1554,7 +1589,8 @@ function detectOpenCloseHandToContinue() {
   ) {
     if (handState === "open") {
       if (
-        openingGesture.openSince === 0
+        openingGesture.openSince ===
+        0
       ) {
         openingGesture.openSince =
           now;
@@ -1761,9 +1797,7 @@ function selectSeason(keyName) {
 
   if (!target) return;
 
-  // זו העונה שמוצגת כרגע בלבד
   currentSeason = keyName;
-
   selectedSeason = null;
   pendingSeason = null;
 
@@ -1863,7 +1897,6 @@ function confirmCurrentSeason() {
     return;
   }
 
-  // רק כאן נשמרת הבחירה הסופית
   selectedSeason =
     currentSeason;
 
@@ -1897,7 +1930,6 @@ function confirmCurrentSeason() {
     return;
   }
 
-  // קרוס־פייד מהלופ של העונה לסרטון המתאים
   startCrossfade(
     currentScene,
     targetVideo,
@@ -1942,9 +1974,6 @@ function selectYesNoAnswer(answerKey) {
   resetChoiceGesture(
     yesNoGesture,
   );
-
-  // נשארים כרגע במסך כדי לבדוק
-  // את המיקומים והאינטראקציה.
 }
 
 function getHoveredArrowKey() {
@@ -2544,7 +2573,6 @@ function checkAutoTransition() {
     return;
   }
 
-  // אחרי Fade Out עוברים ל־Fade In של העונה הבאה
   if (
     SEASON_FADE_OUT_TO_KEY[
       currentScene
@@ -2722,7 +2750,10 @@ function isTransitionTargetReady(
     toSceneId ===
     "scene07YesNoChoice"
   ) {
-    return !!yesNoImage;
+    return layerVideosReady(
+      "scene07QaBackground",
+      "scene07QaLoop",
+    );
   }
 
   if (
@@ -3567,32 +3598,39 @@ function drawYesNoChoiceScene(
 ) {
   showCanvas();
 
+  // שכבה 1: רקע
+  drawVideo(
+    "scene07QaBackground",
+    alpha,
+  );
+
+  // שכבה 2: הטקסטים
   drawingContext.save();
 
   drawingContext.globalAlpha =
     alpha;
 
-  if (yesNoImage) {
-    imageMode(CORNER);
-
-    image(
-      yesNoImage,
-      0,
-      0,
-      W,
-      H,
-    );
-  } else {
-    background(0);
-  }
-
   drawYesNoTexts();
 
-  if (showCursor) {
-    drawHandCursor();
-  }
-
   drawingContext.restore();
+
+  // שכבה 3: הלופ השקוף מעל הטקסטים
+  drawVideo(
+    "scene07QaLoop",
+    alpha,
+  );
+
+  // שכבה 4: מחוון היד
+  if (showCursor) {
+    drawingContext.save();
+
+    drawingContext.globalAlpha =
+      alpha;
+
+    drawHandCursor();
+
+    drawingContext.restore();
+  }
 }
 
 function drawYesNoTexts() {
@@ -3862,7 +3900,6 @@ function keyPressed() {
     );
   }
 
-  // בחירת עונה בלי יד
   if (
     key === "q" &&
     currentScene ===
@@ -3895,7 +3932,6 @@ function keyPressed() {
     selectSeason("autumn");
   }
 
-  // דפדוף בלי יד
   if (
     keyCode === LEFT_ARROW &&
     isSeasonLoopScene(
@@ -3914,7 +3950,6 @@ function keyPressed() {
     navigateSeason("next");
   }
 
-  // אישור העונה בלי יד
   if (
     keyCode === ENTER &&
     isSeasonLoopScene(
@@ -3924,14 +3959,13 @@ function keyPressed() {
     confirmCurrentSeason();
   }
 
-  // מעבר ישיר למסך Yes / No
+  // מעבר ישיר למסך החדש
   if (key === "8") {
     playScene(
       "scene07YesNoChoice",
     );
   }
 
-  // בדיקת Yes / No בלי יד
   if (
     key === "y" &&
     currentScene ===
