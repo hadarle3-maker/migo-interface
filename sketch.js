@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V22 - INTERACTIVE SEASONS CHOICE");
+console.log("MIGO FLOW V23 - SEASONS LOOP CROSSFADE");
 
 const W = 1920;
 const H = 1080;
@@ -9,8 +9,8 @@ let cnv;
 let videos = {};
 let webcam;
 let handPose;
-let hands = [];
 let faceMesh;
+let hands = [];
 let faces = [];
 let pronounFont;
 
@@ -18,44 +18,50 @@ let currentScene = "logoLoop";
 let firstFrameShown = false;
 let audioUnlocked = false;
 
+// סאונד חיצוני ל־Voice Scan
 let voiceScanSound;
 const VOICE_SCAN_SOUND_SRC = "assets/sound/sound_scan.mp3";
 const VOICE_SCAN_SOUND_VOLUME = 0.15;
 
+// מעברים
 let isCrossfading = false;
-let crossfadeDuration = 0.65;
 let activeTransition = null;
+const crossfadeDuration = 0.65;
+const seasonLoopCrossfadeDuration = 0.9;
 
+// פתיחת אודיו באמצעות זיהוי פנים
 let faceSeenSince = 0;
-let faceHoldToUnlockAudio = 250;
+const faceHoldToUnlockAudio = 250;
 
-let gesturePhase = "waitingOpen";
-let openSince = 0;
-let closedSince = 0;
-let openHoldTime = 350;
-let closedHoldTime = 250;
-let lastHandGestureTime = 0;
-let gestureCooldown = 1400;
+// מחוות יד
+const openHoldTime = 350;
+const closedHoldTime = 250;
 
-let pronounChoiceGesture = {
+let openingGesture = {
   phase: "waitingOpen",
   openSince: 0,
   closedSince: 0,
-  targetKey: "",
   lastGestureTime: 0,
   cooldown: 1400,
 };
 
-let seasonChoiceGesture = {
-  phase: "waitingOpen",
-  openSince: 0,
-  closedSince: 0,
-  targetKey: "",
-  lastGestureTime: 0,
-  cooldown: 1400,
-};
+let pronounGesture = createChoiceGesture();
+let seasonGesture = createChoiceGesture();
 
+function createChoiceGesture() {
+  return {
+    phase: "waitingOpen",
+    openSince: 0,
+    closedSince: 0,
+    targetKey: "",
+    lastGestureTime: 0,
+    cooldown: 1400,
+  };
+}
+
+// מחוון יד
 let mirrorHandX = true;
+let cursorSize = 40;
 
 let handCursor = {
   x: W / 2,
@@ -63,15 +69,11 @@ let handCursor = {
   visible: false,
 };
 
-let cursorSize = 40;
-let showPositionDots = false;
-
-let pronounBaseSize = 240;
-let pronounHoverScale = 1.3;
-let pronounTracking = -10;
-
-// #A8A1E1 באופסיטי 28%
-let pronounColor = [168, 161, 225, 71];
+// טקסטים He / She / They
+const pronounBaseSize = 240;
+const pronounHoverScale = 1.3;
+const pronounTracking = -10;
+const pronounColor = [168, 161, 225, 71];
 
 let pronounHoverScales = {
   he: 1,
@@ -79,12 +81,11 @@ let pronounHoverScales = {
   they: 1,
 };
 
-let seasonBaseSize = 180;
-let seasonHoverScale = 1.3;
-let seasonTracking = -10;
-
-// בדיוק אותו צבע ואותו אופסיטי כמו He / She / They
-let seasonColor = [168, 161, 225, 71];
+// טקסטים של העונות — אותו צבע ואותו אופסיטי
+const seasonBaseSize = 180;
+const seasonHoverScale = 1.3;
+const seasonTracking = -10;
+const seasonColor = [168, 161, 225, 71];
 
 let seasonHoverScales = {
   summer: 1,
@@ -93,6 +94,9 @@ let seasonHoverScales = {
   autumn: 1,
 };
 
+let showPositionDots = false;
+
+// Voice Scan
 let voiceLoopEnteredAt = 0;
 let voiceElementTriggered = false;
 let voiceElementPlaying = false;
@@ -100,7 +104,7 @@ let voiceElementActive = false;
 
 let voiceAnsDelayActive = false;
 let voiceAnsDelayStartedAt = 0;
-let voiceAnsDelayMs = 650;
+const voiceAnsDelayMs = 650;
 
 let mouthPrevRatio = null;
 let mouthBaselineRatio = null;
@@ -108,14 +112,14 @@ let mouthActivityFrames = 0;
 let mouthDebugCounter = 0;
 
 let mouthCalibrationStartedAt = 0;
-let mouthCalibrationDuration = 1600;
+const mouthCalibrationDuration = 1600;
 let mouthCalibrationSamples = [];
 let mouthCalibrationDone = false;
 
-let mouthMovementDeltaThreshold = 0.006;
-let mouthOpenAboveBaselineThreshold = 0.018;
-let mouthActivityFramesNeeded = 7;
-let voiceDetectionDelay = 500;
+const mouthMovementDeltaThreshold = 0.006;
+const mouthOpenAboveBaselineThreshold = 0.018;
+const mouthActivityFramesNeeded = 7;
+const voiceDetectionDelay = 500;
 
 const VIDEO_FILES = {
   logoLoop: {
@@ -131,7 +135,6 @@ const VIDEO_FILES = {
     src: "assets/videos/logo_to_secen_01.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0.18,
   },
@@ -140,7 +143,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_01.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0.08,
     endTrim: 0.18,
   },
@@ -149,7 +151,6 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_02.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0.18,
   },
@@ -158,7 +159,6 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_02_background_mute.mp4",
     volume: 0,
     loop: true,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -167,7 +167,6 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_02_loop.webm",
     volume: 0,
     loop: true,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -176,7 +175,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_02_ans_she.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -185,7 +183,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_02_ans_he.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -194,7 +191,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_02_ans_they.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -203,7 +199,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_03_she_to_love_face.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -212,7 +207,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_03_he_to_love_face.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -221,7 +215,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_03_they_to_love_face.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -230,7 +223,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_05_scan_voice_only.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -239,7 +231,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_05_scan_voice_background.mp4",
     volume: 0,
     loop: true,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -248,7 +239,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_05_scan_voice_element.webm",
     volume: 0,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -257,7 +247,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_05_scan_voice_blob.webm",
     volume: 0,
     loop: true,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -266,7 +255,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_05_scan_voice_ans.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0.18,
   },
@@ -275,7 +263,6 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_06_seasons.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0.18,
   },
@@ -284,7 +271,6 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_06_seasons_background.mp4",
     volume: 0,
     loop: true,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -293,7 +279,6 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_06_seasons_loop.webm",
     volume: 0,
     loop: true,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -302,7 +287,6 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_06_seasons_summer_in.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0.18,
   },
@@ -311,7 +295,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_06_Seasons_summer_loop.mp4",
     volume: 1,
     loop: true,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -320,7 +303,6 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_06_seasons_winter_in.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0.18,
   },
@@ -329,7 +311,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_06_Seasons_winter_loop.mp4",
     volume: 1,
     loop: true,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -338,7 +319,6 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_06_seasons_spring_in.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0.18,
   },
@@ -347,7 +327,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_06_Seasons_spring_loop.mp4",
     volume: 1,
     loop: true,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -356,7 +335,6 @@ const VIDEO_FILES = {
     src: "assets/videos/scene_06_seasons_autumn_in.mp4",
     volume: 1,
     loop: false,
-    customLoop: false,
     startAt: 0,
     endTrim: 0.18,
   },
@@ -365,7 +343,6 @@ const VIDEO_FILES = {
     src: "assets/videos/secen_06_Seasons_Autumn_loop.mp4",
     volume: 1,
     loop: true,
-    customLoop: false,
     startAt: 0,
     endTrim: 0,
   },
@@ -430,28 +407,75 @@ const SEASON_IN_VIDEOS = {
   autumn: "scene06AutumnIn",
 };
 
-const AUTO_VIDEO_TRANSITIONS = {
-  logoToScene01: "scene01",
-  scene01: "scene02Intro",
-  scene02Intro: "scene02Choice",
+const AUTO_TRANSITIONS = {
+  logoToScene01: {
+    to: "scene01",
+  },
 
-  scene02AnsShe: "scene03SheToLoveFace",
-  scene02AnsHe: "scene03HeToLoveFace",
-  scene02AnsThey: "scene03TheyToLoveFace",
+  scene01: {
+    to: "scene02Intro",
+  },
 
-  scene03SheToLoveFace: "scene05ScanVoiceOnly",
-  scene03HeToLoveFace: "scene05ScanVoiceOnly",
-  scene03TheyToLoveFace: "scene05ScanVoiceOnly",
+  scene02Intro: {
+    to: "scene02Choice",
+  },
 
-  scene05ScanVoiceOnly: "scene05VoiceLoop",
-  scene05ScanVoiceAns: "scene06SeasonsIntro",
+  scene02AnsShe: {
+    to: "scene03SheToLoveFace",
+  },
 
-  scene06SeasonsIntro: "scene06SeasonsChoice",
+  scene02AnsHe: {
+    to: "scene03HeToLoveFace",
+  },
 
-  scene06SummerIn: "scene06SummerLoop",
-  scene06WinterIn: "scene06WinterLoop",
-  scene06SpringIn: "scene06SpringLoop",
-  scene06AutumnIn: "scene06AutumnLoop",
+  scene02AnsThey: {
+    to: "scene03TheyToLoveFace",
+  },
+
+  scene03SheToLoveFace: {
+    to: "scene05ScanVoiceOnly",
+  },
+
+  scene03HeToLoveFace: {
+    to: "scene05ScanVoiceOnly",
+  },
+
+  scene03TheyToLoveFace: {
+    to: "scene05ScanVoiceOnly",
+  },
+
+  scene05ScanVoiceOnly: {
+    to: "scene05VoiceLoop",
+  },
+
+  scene05ScanVoiceAns: {
+    to: "scene06SeasonsIntro",
+  },
+
+  scene06SeasonsIntro: {
+    to: "scene06SeasonsChoice",
+  },
+
+  // קרוס־פייד ייעודי בין סרטוני ה־in ללופים
+  scene06SummerIn: {
+    to: "scene06SummerLoop",
+    duration: seasonLoopCrossfadeDuration,
+  },
+
+  scene06WinterIn: {
+    to: "scene06WinterLoop",
+    duration: seasonLoopCrossfadeDuration,
+  },
+
+  scene06SpringIn: {
+    to: "scene06SpringLoop",
+    duration: seasonLoopCrossfadeDuration,
+  },
+
+  scene06AutumnIn: {
+    to: "scene06AutumnLoop",
+    duration: seasonLoopCrossfadeDuration,
+  },
 };
 
 function preload() {
@@ -510,7 +534,7 @@ function draw() {
 }
 
 /* -----------------------------
-   VIDEO LOADING
+   VIDEO / SOUND LOADING
 ----------------------------- */
 
 function loadVideos() {
@@ -551,16 +575,6 @@ function createVideoElement(id, src) {
   );
 
   el.addEventListener(
-    "canplay",
-    function () {
-      console.log(
-        "VIDEO CAN PLAY:",
-        id,
-      );
-    },
-  );
-
-  el.addEventListener(
     "error",
     function () {
       console.log(
@@ -575,15 +589,11 @@ function createVideoElement(id, src) {
   el.load();
 
   return {
-    id: id,
-    src: src,
-    el: el,
+    id,
+    src,
+    el,
   };
 }
-
-/* -----------------------------
-   SOUND LOADING
------------------------------ */
 
 function loadSounds() {
   voiceScanSound =
@@ -597,28 +607,6 @@ function loadSounds() {
     VOICE_SCAN_SOUND_VOLUME;
 
   voiceScanSound.muted = true;
-
-  voiceScanSound.addEventListener(
-    "canplaythrough",
-    function () {
-      console.log(
-        "VOICE SCAN SOUND READY:",
-        VOICE_SCAN_SOUND_SRC,
-      );
-    },
-  );
-
-  voiceScanSound.addEventListener(
-    "error",
-    function () {
-      console.log(
-        "VOICE SCAN SOUND ERROR:",
-        VOICE_SCAN_SOUND_SRC,
-        voiceScanSound.error,
-      );
-    },
-  );
-
   voiceScanSound.load();
 }
 
@@ -639,21 +627,21 @@ function unlockAudio(
   );
 
   for (let id in videos) {
-    let video = videos[id];
+    videos[id].el.muted = false;
 
-    video.el.muted = false;
-    video.el.removeAttribute("muted");
+    videos[id].el.removeAttribute(
+      "muted",
+    );
 
-    if (id === currentScene) {
-      video.el.volume =
-        VIDEO_FILES[id].volume;
-    } else {
-      video.el.volume = 0;
-    }
+    videos[id].el.volume =
+      id === currentScene
+        ? VIDEO_FILES[id].volume
+        : 0;
   }
 
   if (voiceScanSound) {
     voiceScanSound.muted = false;
+
     voiceScanSound.volume =
       VOICE_SCAN_SOUND_VOLUME;
   }
@@ -681,15 +669,15 @@ function applyAudioState(
 
   if (audioUnlocked) {
     video.el.muted = false;
-    video.el.removeAttribute("muted");
 
-    if (volumeLevel !== null) {
-      video.el.volume =
-        volumeLevel;
-    } else {
-      video.el.volume =
-        VIDEO_FILES[id].volume;
-    }
+    video.el.removeAttribute(
+      "muted",
+    );
+
+    video.el.volume =
+      volumeLevel !== null
+        ? volumeLevel
+        : VIDEO_FILES[id].volume;
   } else {
     video.el.muted = true;
     video.el.volume = 0;
@@ -702,6 +690,7 @@ function playVoiceScanSound() {
   try {
     voiceScanSound.pause();
     voiceScanSound.currentTime = 0;
+
     voiceScanSound.volume =
       VOICE_SCAN_SOUND_VOLUME;
 
@@ -740,44 +729,14 @@ function playScene(id) {
   stopAllVideos();
   stopVoiceScanSound();
 
-  if (id === "scene02Choice") {
-    resetChoiceGesture(
-      pronounChoiceGesture,
-    );
+  if (isSpecialScene(id)) {
+    resetSceneGesture(id);
 
-    startScene02ChoiceVideos(
+    startSpecialScene(
+      id,
       true,
     );
 
-    showCanvas();
-    return;
-  }
-
-  if (id === "scene05VoiceLoop") {
-    startScene05VoiceLoopVideos(
-      true,
-    );
-
-    showCanvas();
-    return;
-  }
-
-  if (
-    id === "scene06SeasonsChoice"
-  ) {
-    resetChoiceGesture(
-      seasonChoiceGesture,
-    );
-
-    startScene06SeasonsChoiceVideos(
-      true,
-    );
-
-    showCanvas();
-    return;
-  }
-
-  if (id === "successScreen") {
     showCanvas();
     return;
   }
@@ -793,15 +752,37 @@ function playScene(id) {
     return;
   }
 
+  startVideo(
+    id,
+    true,
+    VIDEO_FILES[id].volume,
+  );
+}
+
+function startVideo(
+  id,
+  resetToStart,
+  volumeLevel,
+) {
+  let video = videos[id];
+
+  if (!video) return;
+
   video.el.loop =
     VIDEO_FILES[id].loop || false;
 
-  applyAudioState(id);
+  applyAudioState(
+    id,
+    volumeLevel,
+  );
 
-  try {
-    video.el.currentTime =
-      VIDEO_FILES[id].startAt || 0;
-  } catch (e) {}
+  if (resetToStart) {
+    try {
+      video.el.currentTime =
+        VIDEO_FILES[id].startAt ||
+        0;
+    } catch (e) {}
+  }
 
   video.el
     .play()
@@ -823,92 +804,137 @@ function showCanvas() {
   }
 }
 
-function startScene02ChoiceVideos(
-  resetToStart,
-) {
-  startLayerLoopVideo(
-    "scene02Background",
-    resetToStart,
-  );
-
-  startLayerLoopVideo(
-    "scene02BlobLoop",
-    resetToStart,
+function isSpecialScene(id) {
+  return (
+    id === "scene02Choice" ||
+    id === "scene05VoiceLoop" ||
+    id === "scene06SeasonsChoice" ||
+    id === "successScreen"
   );
 }
 
-function stopScene02ChoiceVideos() {
-  stopSingleVideo(
-    "scene02Background",
-  );
+function resetSceneGesture(id) {
+  if (id === "scene02Choice") {
+    resetChoiceGesture(
+      pronounGesture,
+    );
+  }
 
-  stopSingleVideo(
-    "scene02BlobLoop",
-  );
+  if (
+    id ===
+    "scene06SeasonsChoice"
+  ) {
+    resetChoiceGesture(
+      seasonGesture,
+    );
+  }
 }
 
-function startScene05VoiceLoopVideos(
+function startSpecialScene(
+  id,
   resetToStart,
 ) {
-  startLayerLoopVideo(
-    "scene05ScanVoiceBackground",
-    resetToStart,
-  );
+  if (id === "scene02Choice") {
+    startLayerLoopVideo(
+      "scene02Background",
+      resetToStart,
+    );
 
-  startLayerLoopVideo(
-    "scene05ScanVoiceBlob",
-    resetToStart,
-  );
+    startLayerLoopVideo(
+      "scene02BlobLoop",
+      resetToStart,
+    );
+  }
 
-  if (resetToStart) {
+  if (id === "scene05VoiceLoop") {
+    startLayerLoopVideo(
+      "scene05ScanVoiceBackground",
+      resetToStart,
+    );
+
+    startLayerLoopVideo(
+      "scene05ScanVoiceBlob",
+      resetToStart,
+    );
+
+    if (resetToStart) {
+      stopSingleVideo(
+        "scene05ScanVoiceElement",
+      );
+
+      resetVoiceScanState();
+    }
+
+    voiceLoopEnteredAt =
+      millis();
+  }
+
+  if (
+    id ===
+    "scene06SeasonsChoice"
+  ) {
+    startLayerLoopVideo(
+      "scene06SeasonsBackground",
+      resetToStart,
+    );
+
+    startLayerLoopVideo(
+      "scene06SeasonsBlobLoop",
+      resetToStart,
+    );
+  }
+}
+
+function stopSpecialScene(id) {
+  if (id === "scene02Choice") {
+    stopSingleVideo(
+      "scene02Background",
+    );
+
+    stopSingleVideo(
+      "scene02BlobLoop",
+    );
+  }
+
+  if (id === "scene05VoiceLoop") {
+    stopSingleVideo(
+      "scene05ScanVoiceBackground",
+    );
+
     stopSingleVideo(
       "scene05ScanVoiceElement",
     );
 
+    stopSingleVideo(
+      "scene05ScanVoiceBlob",
+    );
+
+    stopVoiceScanSound();
     resetVoiceScanState();
   }
 
-  voiceLoopEnteredAt = millis();
+  if (
+    id ===
+    "scene06SeasonsChoice"
+  ) {
+    stopSingleVideo(
+      "scene06SeasonsBackground",
+    );
+
+    stopSingleVideo(
+      "scene06SeasonsBlobLoop",
+    );
+  }
 }
 
-function stopScene05VoiceLoopVideos() {
-  stopSingleVideo(
-    "scene05ScanVoiceBackground",
-  );
-
-  stopSingleVideo(
-    "scene05ScanVoiceElement",
-  );
-
-  stopSingleVideo(
-    "scene05ScanVoiceBlob",
-  );
-
-  stopVoiceScanSound();
-  resetVoiceScanState();
-}
-
-function startScene06SeasonsChoiceVideos(
+function startLayerLoopVideo(
+  id,
   resetToStart,
 ) {
-  startLayerLoopVideo(
-    "scene06SeasonsBackground",
+  startVideo(
+    id,
     resetToStart,
-  );
-
-  startLayerLoopVideo(
-    "scene06SeasonsBlobLoop",
-    resetToStart,
-  );
-}
-
-function stopScene06SeasonsChoiceVideos() {
-  stopSingleVideo(
-    "scene06SeasonsBackground",
-  );
-
-  stopSingleVideo(
-    "scene06SeasonsBlobLoop",
+    0,
   );
 }
 
@@ -921,45 +947,9 @@ function stopSingleVideo(id) {
 
   try {
     videos[id].el.currentTime =
-      VIDEO_FILES[id].startAt || 0;
+      VIDEO_FILES[id].startAt ||
+      0;
   } catch (e) {}
-}
-
-function startLayerLoopVideo(
-  id,
-  resetToStart,
-) {
-  let video = videos[id];
-
-  if (!video) {
-    console.log(
-      "Missing layer video:",
-      id,
-    );
-
-    return;
-  }
-
-  video.el.loop = true;
-  applyAudioState(id, 0);
-
-  if (resetToStart) {
-    try {
-      video.el.currentTime =
-        VIDEO_FILES[id].startAt ||
-        0;
-    } catch (e) {}
-  }
-
-  video.el
-    .play()
-    .catch(function (err) {
-      console.log(
-        "PLAY LAYER LOOP FAILED:",
-        id,
-        err,
-      );
-    });
 }
 
 function stopAllVideos() {
@@ -980,32 +970,32 @@ function checkManualLoop() {
   let def =
     VIDEO_FILES[currentScene];
 
+  let video =
+    videos[currentScene];
+
   if (
     !def ||
+    !video ||
     !def.customLoop ||
-    !videos[currentScene]
+    !video.el.duration
   ) {
     return;
   }
 
-  let video =
-    videos[currentScene].el;
-
-  if (!video.duration) return;
-
   let virtualEnd =
-    video.duration -
+    video.el.duration -
     (def.endTrim || 0);
 
   if (
-    video.currentTime >= virtualEnd
+    video.el.currentTime >=
+    virtualEnd
   ) {
     try {
-      video.currentTime =
+      video.el.currentTime =
         def.startAt || 0;
     } catch (e) {}
 
-    video
+    video.el
       .play()
       .catch(function (err) {
         console.log(
@@ -1068,7 +1058,11 @@ function updateInteraction() {
       "scene02Choice" &&
     !isCrossfading
   ) {
-    detectPronounSelection();
+    detectChoiceSelection(
+      pronounGesture,
+      getHoveredPronounKey(),
+      selectPronoun,
+    );
   }
 
   if (
@@ -1084,7 +1078,11 @@ function updateInteraction() {
       "scene06SeasonsChoice" &&
     !isCrossfading
   ) {
-    detectSeasonSelection();
+    detectChoiceSelection(
+      seasonGesture,
+      getHoveredSeasonKey(),
+      selectSeason,
+    );
   }
 }
 
@@ -1115,28 +1113,26 @@ function updateHandCursor() {
     return;
   }
 
-  let p = getHandCenterPoint(
-    hands[0],
-  );
+  let point =
+    getHandCenterPoint(
+      hands[0],
+    );
 
-  if (!p) {
+  if (!point) {
     handCursor.visible = false;
     return;
   }
 
-  let mappedX;
-
-  if (mirrorHandX) {
-    mappedX =
-      W -
-      (p.x / CAM_W) * W;
-  } else {
-    mappedX =
-      (p.x / CAM_W) * W;
-  }
+  let mappedX =
+    mirrorHandX
+      ? W -
+        (point.x / CAM_W) *
+          W
+      : (point.x / CAM_W) *
+        W;
 
   let mappedY =
-    (p.y / CAM_H) * H;
+    (point.y / CAM_H) * H;
 
   mappedX = constrain(
     mappedX,
@@ -1183,19 +1179,15 @@ function getHandCenterPoint(hand) {
   let sumY = 0;
   let count = 0;
 
-  for (
-    let i = 0;
-    i < indexes.length;
-    i++
-  ) {
-    let p = getHandPoint(
+  for (let index of indexes) {
+    let point = getHandPoint(
       hand,
-      indexes[i],
+      index,
     );
 
-    if (p) {
-      sumX += p.x;
-      sumY += p.y;
+    if (point) {
+      sumX += point.x;
+      sumY += point.y;
       count++;
     }
   }
@@ -1215,16 +1207,11 @@ function getHandCenterPoint(hand) {
 
 function detectOpenCloseHandToContinue() {
   if (hands.length === 0) {
-    gesturePhase =
-      "waitingOpen";
-
-    openSince = 0;
-    closedSince = 0;
-
+    resetOpeningGesture();
     return;
   }
 
-  let state =
+  let handState =
     getHandOpenCloseState(
       hands[0],
     );
@@ -1232,80 +1219,82 @@ function detectOpenCloseHandToContinue() {
   let now = millis();
 
   if (
-    gesturePhase === "waitingOpen"
+    openingGesture.phase ===
+    "waitingOpen"
   ) {
-    if (state === "open") {
-      if (openSince === 0) {
-        openSince = now;
+    if (handState === "open") {
+      if (
+        openingGesture.openSince ===
+        0
+      ) {
+        openingGesture.openSince =
+          now;
       }
 
       if (
-        now - openSince >
+        now -
+          openingGesture.openSince >
         openHoldTime
       ) {
-        gesturePhase =
+        openingGesture.phase =
           "waitingClosed";
 
-        closedSince = 0;
+        openingGesture.closedSince =
+          0;
       }
     } else {
-      openSince = 0;
+      openingGesture.openSince =
+        0;
     }
   }
 
   if (
-    gesturePhase ===
+    openingGesture.phase ===
     "waitingClosed"
   ) {
-    if (state === "closed") {
-      if (closedSince === 0) {
-        closedSince = now;
+    if (handState === "closed") {
+      if (
+        openingGesture.closedSince ===
+        0
+      ) {
+        openingGesture.closedSince =
+          now;
       }
 
       if (
-        now - closedSince >
+        now -
+          openingGesture.closedSince >
           closedHoldTime &&
         now -
-          lastHandGestureTime >
-          gestureCooldown
+          openingGesture.lastGestureTime >
+          openingGesture.cooldown
       ) {
-        lastHandGestureTime =
+        openingGesture.lastGestureTime =
           now;
 
-        gesturePhase =
-          "waitingOpen";
-
-        openSince = 0;
-        closedSince = 0;
+        resetOpeningGesture();
 
         playScene(
           "logoToScene01",
         );
       }
     } else {
-      closedSince = 0;
+      openingGesture.closedSince =
+        0;
     }
   }
 }
 
-function detectPronounSelection() {
-  updateChoiceGesture(
-    pronounChoiceGesture,
-    getHoveredPronounKey(),
-    selectPronoun,
-  );
+function resetOpeningGesture() {
+  openingGesture.phase =
+    "waitingOpen";
+
+  openingGesture.openSince = 0;
+  openingGesture.closedSince = 0;
 }
 
-function detectSeasonSelection() {
-  updateChoiceGesture(
-    seasonChoiceGesture,
-    getHoveredSeasonKey(),
-    selectSeason,
-  );
-}
-
-function updateChoiceGesture(
-  stateObject,
+function detectChoiceSelection(
+  gesture,
   hoveredKey,
   onSelect,
 ) {
@@ -1315,7 +1304,7 @@ function updateChoiceGesture(
     !hoveredKey
   ) {
     resetChoiceGesture(
-      stateObject,
+      gesture,
     );
 
     return;
@@ -1329,51 +1318,47 @@ function updateChoiceGesture(
   let now = millis();
 
   if (
-    stateObject.phase ===
+    gesture.phase ===
     "waitingOpen"
   ) {
     if (handState === "open") {
       if (
-        stateObject.openSince ===
-          0 ||
-        stateObject.targetKey !==
+        gesture.openSince === 0 ||
+        gesture.targetKey !==
           hoveredKey
       ) {
-        stateObject.openSince =
-          now;
-
-        stateObject.targetKey =
+        gesture.openSince = now;
+        gesture.targetKey =
           hoveredKey;
       }
 
       if (
         now -
-          stateObject.openSince >
+          gesture.openSince >
         openHoldTime
       ) {
-        stateObject.phase =
+        gesture.phase =
           "waitingClosed";
 
-        stateObject.closedSince =
-          0;
+        gesture.closedSince = 0;
       }
     } else {
-      stateObject.openSince = 0;
-      stateObject.targetKey =
+      gesture.openSince = 0;
+      gesture.targetKey =
         hoveredKey;
     }
   }
 
   if (
-    stateObject.phase ===
+    gesture.phase ===
     "waitingClosed"
   ) {
     if (
       hoveredKey !==
-      stateObject.targetKey
+      gesture.targetKey
     ) {
       resetChoiceGesture(
-        stateObject,
+        gesture,
       );
 
       return;
@@ -1381,117 +1366,101 @@ function updateChoiceGesture(
 
     if (handState === "closed") {
       if (
-        stateObject.closedSince ===
+        gesture.closedSince ===
         0
       ) {
-        stateObject.closedSince =
+        gesture.closedSince =
           now;
       }
 
       if (
         now -
-          stateObject.closedSince >
+          gesture.closedSince >
           closedHoldTime &&
         now -
-          stateObject.lastGestureTime >
-          stateObject.cooldown
+          gesture.lastGestureTime >
+          gesture.cooldown
       ) {
-        stateObject.lastGestureTime =
+        gesture.lastGestureTime =
           now;
 
-        onSelect(hoveredKey);
+        onSelect(
+          hoveredKey,
+        );
       }
     } else {
-      stateObject.closedSince = 0;
+      gesture.closedSince = 0;
     }
   }
 }
 
 function resetChoiceGesture(
-  stateObject,
+  gesture,
 ) {
-  stateObject.phase =
+  gesture.phase =
     "waitingOpen";
 
-  stateObject.openSince = 0;
-  stateObject.closedSince = 0;
-  stateObject.targetKey = "";
+  gesture.openSince = 0;
+  gesture.closedSince = 0;
+  gesture.targetKey = "";
 }
 
-function selectPronoun(keyName) {
-  let answerVideoId =
+function selectPronoun(
+  keyName,
+) {
+  let target =
     PRONOUN_ANSWER_VIDEOS[
       keyName
     ];
 
-  if (!answerVideoId) return;
-
-  console.log(
-    "PRONOUN SELECTED:",
-    keyName,
-    "->",
-    answerVideoId,
-  );
+  if (!target) return;
 
   resetChoiceGesture(
-    pronounChoiceGesture,
+    pronounGesture,
   );
 
   startCrossfade(
     "scene02Choice",
-    answerVideoId,
+    target,
   );
 }
 
 function selectSeason(keyName) {
-  let inVideoId =
+  let target =
     SEASON_IN_VIDEOS[
       keyName
     ];
 
-  if (!inVideoId) return;
-
-  console.log(
-    "SEASON SELECTED:",
-    keyName,
-    "->",
-    inVideoId,
-  );
+  if (!target) return;
 
   resetChoiceGesture(
-    seasonChoiceGesture,
+    seasonGesture,
   );
 
   startCrossfade(
     "scene06SeasonsChoice",
-    inVideoId,
+    target,
   );
 }
 
 function getHoveredPronounKey() {
-  let keys = [
-    "he",
-    "she",
-    "they",
-  ];
-
   for (
-    let i = 0;
-    i < keys.length;
-    i++
+    let key of [
+      "he",
+      "she",
+      "they",
+    ]
   ) {
-    let keyName = keys[i];
-
     if (
       isCursorOverChoice(
-        keyName,
+        key,
         PRONOUN_POSITIONS,
         pronounBaseSize,
         pronounTracking,
         "scene02Choice",
       )
     ) {
-      return keyName;
+      return key;
     }
   }
 
@@ -1499,30 +1468,24 @@ function getHoveredPronounKey() {
 }
 
 function getHoveredSeasonKey() {
-  let keys = [
-    "summer",
-    "winter",
-    "spring",
-    "autumn",
-  ];
-
   for (
-    let i = 0;
-    i < keys.length;
-    i++
+    let key of [
+      "summer",
+      "winter",
+      "spring",
+      "autumn",
+    ]
   ) {
-    let keyName = keys[i];
-
     if (
       isCursorOverChoice(
-        keyName,
+        key,
         SEASON_POSITIONS,
         seasonBaseSize,
         seasonTracking,
         "scene06SeasonsChoice",
       )
     ) {
-      return keyName;
+      return key;
     }
   }
 
@@ -1541,10 +1504,14 @@ function resetVoiceScanState() {
   voiceAnsDelayActive = false;
   voiceAnsDelayStartedAt = 0;
 
+  resetMouthCalibration();
+  mouthDebugCounter = 0;
+}
+
+function resetMouthCalibration() {
   mouthPrevRatio = null;
   mouthBaselineRatio = null;
   mouthActivityFrames = 0;
-  mouthDebugCounter = 0;
 
   mouthCalibrationStartedAt = 0;
   mouthCalibrationSamples = [];
@@ -1603,17 +1570,16 @@ function detectMouthMovementForVoiceScan() {
         mouthCalibrationStartedAt >=
       mouthCalibrationDuration
     ) {
-      let sum = 0;
-
-      for (
-        let i = 0;
-        i <
-        mouthCalibrationSamples.length;
-        i++
-      ) {
-        sum +=
-          mouthCalibrationSamples[i];
-      }
+      let sum =
+        mouthCalibrationSamples.reduce(
+          function (
+            total,
+            value,
+          ) {
+            return total + value;
+          },
+          0,
+        );
 
       mouthBaselineRatio =
         sum /
@@ -1697,16 +1663,6 @@ function detectMouthMovementForVoiceScan() {
       "mouth movement",
     );
   }
-}
-
-function resetMouthCalibration() {
-  mouthPrevRatio = null;
-  mouthBaselineRatio = null;
-  mouthActivityFrames = 0;
-
-  mouthCalibrationStartedAt = 0;
-  mouthCalibrationSamples = [];
-  mouthCalibrationDone = false;
 }
 
 function getMouthOpenRatio(face) {
@@ -1871,6 +1827,7 @@ function checkVoiceElementEnd() {
     stopVoiceScanSound();
 
     voiceAnsDelayActive = true;
+
     voiceAnsDelayStartedAt =
       millis();
 
@@ -1920,19 +1877,15 @@ function getHandOpenCloseState(
 
   let extendedCount = 0;
 
-  for (
-    let i = 0;
-    i < fingers.length;
-    i++
-  ) {
+  for (let pair of fingers) {
     let tip = getHandPoint(
       hand,
-      fingers[i][0],
+      pair[0],
     );
 
     let pip = getHandPoint(
       hand,
-      fingers[i][1],
+      pair[1],
     );
 
     if (!tip || !pip) {
@@ -2011,7 +1964,7 @@ function getHandPoint(
 }
 
 /* -----------------------------
-   AUTO TRANSITIONS
+   AUTO TRANSITIONS / CROSSFADE
 ----------------------------- */
 
 function checkAutoTransition() {
@@ -2025,52 +1978,56 @@ function checkAutoTransition() {
     return;
   }
 
-  let targetScene =
-    AUTO_VIDEO_TRANSITIONS[
+  let transition =
+    AUTO_TRANSITIONS[
       currentScene
     ];
 
-  if (targetScene) {
-    checkVideoEndForCrossfade(
-      currentScene,
-      targetScene,
-    );
-  }
+  if (!transition) return;
+
+  checkVideoEndForCrossfade(
+    currentScene,
+    transition.to,
+    transition.duration ||
+      crossfadeDuration,
+  );
 }
 
 function checkVideoEndForCrossfade(
   fromSceneId,
   toSceneId,
+  transitionDuration = crossfadeDuration,
 ) {
-  if (!videos[fromSceneId]) {
-    return;
-  }
-
   let fromVideo =
-    videos[fromSceneId].el;
+    videos[fromSceneId];
 
-  let fromDefinition =
+  let fromDef =
     VIDEO_FILES[fromSceneId];
 
-  if (!fromVideo.duration) {
+  if (
+    !fromVideo ||
+    !fromDef ||
+    !fromVideo.el.duration
+  ) {
     return;
   }
 
   let virtualEnd =
-    fromVideo.duration -
-    (fromDefinition.endTrim || 0);
+    fromVideo.el.duration -
+    (fromDef.endTrim || 0);
 
   let timeLeft =
     virtualEnd -
-    fromVideo.currentTime;
+    fromVideo.el.currentTime;
 
   if (
     timeLeft <=
-    crossfadeDuration
+    transitionDuration
   ) {
     startCrossfade(
       fromSceneId,
       toSceneId,
+      transitionDuration,
     );
   }
 }
@@ -2078,19 +2035,14 @@ function checkVideoEndForCrossfade(
 function startCrossfade(
   fromSceneId,
   toSceneId,
+  transitionDuration = crossfadeDuration,
 ) {
   if (isCrossfading) return;
 
-  let validFrom =
-    videos[fromSceneId] ||
-    [
-      "scene02Choice",
-      "scene05VoiceLoop",
-      "scene06SeasonsChoice",
-      "successScreen",
-    ].includes(fromSceneId);
-
-  if (!validFrom) {
+  if (
+    !videos[fromSceneId] &&
+    !isSpecialScene(fromSceneId)
+  ) {
     console.log(
       "Missing crossfade from scene:",
       fromSceneId,
@@ -2102,8 +2054,10 @@ function startCrossfade(
   isCrossfading = true;
 
   activeTransition = {
-    fromSceneId: fromSceneId,
-    toSceneId: toSceneId,
+    fromSceneId,
+    toSceneId,
+    duration:
+      transitionDuration,
     fadeStarted: false,
     fadeStartTime: 0,
   };
@@ -2117,74 +2071,27 @@ function prepareTransitionTarget(
   toSceneId,
 ) {
   if (
-    toSceneId ===
-    "scene02Choice"
+    isSpecialScene(toSceneId)
   ) {
-    startScene02ChoiceVideos(
+    resetSceneGesture(
+      toSceneId,
+    );
+
+    startSpecialScene(
+      toSceneId,
       true,
     );
 
     return;
   }
 
-  if (
-    toSceneId ===
-    "scene05VoiceLoop"
-  ) {
-    startScene05VoiceLoopVideos(
+  if (videos[toSceneId]) {
+    startVideo(
+      toSceneId,
       true,
+      0,
     );
-
-    return;
   }
-
-  if (
-    toSceneId ===
-    "scene06SeasonsChoice"
-  ) {
-    startScene06SeasonsChoiceVideos(
-      true,
-    );
-
-    return;
-  }
-
-  if (
-    toSceneId ===
-    "successScreen"
-  ) {
-    return;
-  }
-
-  let video =
-    videos[toSceneId];
-
-  if (!video) return;
-
-  video.el.loop =
-    VIDEO_FILES[toSceneId].loop ||
-    false;
-
-  applyAudioState(
-    toSceneId,
-    0,
-  );
-
-  try {
-    video.el.currentTime =
-      VIDEO_FILES[toSceneId]
-        .startAt || 0;
-  } catch (e) {}
-
-  video.el
-    .play()
-    .catch(function (err) {
-      console.log(
-        "PLAY NEXT FAILED:",
-        toSceneId,
-        err,
-      );
-    });
 }
 
 function isTransitionTargetReady(
@@ -2268,15 +2175,12 @@ function finishCrossfade() {
 
   if (videos[fromSceneId]) {
     videos[fromSceneId].el.pause();
+
     videos[fromSceneId].el.volume =
       0;
   }
 
   currentScene = toSceneId;
-
-  resumeSpecialScene(
-    toSceneId,
-  );
 
   if (videos[toSceneId]) {
     applyAudioState(
@@ -2288,60 +2192,6 @@ function finishCrossfade() {
 
   isCrossfading = false;
   activeTransition = null;
-}
-
-function stopSpecialScene(
-  sceneId,
-) {
-  if (
-    sceneId === "scene02Choice"
-  ) {
-    stopScene02ChoiceVideos();
-  }
-
-  if (
-    sceneId ===
-    "scene05VoiceLoop"
-  ) {
-    stopScene05VoiceLoopVideos();
-  }
-
-  if (
-    sceneId ===
-    "scene06SeasonsChoice"
-  ) {
-    stopScene06SeasonsChoiceVideos();
-  }
-}
-
-function resumeSpecialScene(
-  sceneId,
-) {
-  if (
-    sceneId === "scene02Choice"
-  ) {
-    startScene02ChoiceVideos(
-      false,
-    );
-  }
-
-  if (
-    sceneId ===
-    "scene05VoiceLoop"
-  ) {
-    startScene05VoiceLoopVideos(
-      false,
-    );
-  }
-
-  if (
-    sceneId ===
-    "scene06SeasonsChoice"
-  ) {
-    startScene06SeasonsChoiceVideos(
-      false,
-    );
-  }
 }
 
 /* -----------------------------
@@ -2402,13 +2252,15 @@ function drawCrossfade() {
       activeTransition.fadeStartTime
     ) /
       (
-        crossfadeDuration *
+        activeTransition.duration *
         1000
       ),
     0,
     1,
   );
 
+  // הסצנה היוצאת נשארת מלאה,
+  // והיעד עולה מעליה
   drawSceneById(
     fromSceneId,
     1,
@@ -2472,7 +2324,7 @@ function drawSceneById(
     sceneId ===
     "scene05VoiceLoop"
   ) {
-    drawScene05VoiceLoop(
+    drawVoiceLoop(
       alpha,
     );
 
@@ -2532,6 +2384,7 @@ function drawVideo(
   }
 
   drawingContext.save();
+
   drawingContext.globalAlpha =
     alpha;
 
@@ -2561,6 +2414,7 @@ function drawChoiceScene(
   );
 
   drawingContext.save();
+
   drawingContext.globalAlpha =
     alpha;
 
@@ -2575,6 +2429,7 @@ function drawChoiceScene(
 
   if (showCursor) {
     drawingContext.save();
+
     drawingContext.globalAlpha =
       alpha;
 
@@ -2584,7 +2439,7 @@ function drawChoiceScene(
   }
 }
 
-function drawScene05VoiceLoop(
+function drawVoiceLoop(
   alpha = 1,
 ) {
   showCanvas();
@@ -2624,25 +2479,16 @@ function drawPronounTexts() {
   );
 
   if (showPositionDots) {
-    let keys = [
-      "he",
-      "she",
-      "they",
-    ];
-
     for (
-      let i = 0;
-      i < keys.length;
-      i++
+      let key of [
+        "he",
+        "she",
+        "they",
+      ]
     ) {
-      let pos =
-        PRONOUN_POSITIONS[
-          keys[i]
-        ];
-
       drawPositionDot(
-        pos.x,
-        pos.y,
+        PRONOUN_POSITIONS[key].x,
+        PRONOUN_POSITIONS[key].y,
       );
     }
   }
@@ -2679,7 +2525,9 @@ function drawChoiceTexts(
   push();
 
   if (pronounFont) {
-    textFont(pronounFont);
+    textFont(
+      pronounFont,
+    );
   }
 
   textAlign(
@@ -2696,12 +2544,7 @@ function drawChoiceTexts(
     colorValue[3],
   );
 
-  for (
-    let i = 0;
-    i < keys.length;
-    i++
-  ) {
-    let keyName = keys[i];
+  for (let keyName of keys) {
     let pos =
       positions[keyName];
 
@@ -2790,10 +2633,14 @@ function getChoiceBounds(
   push();
 
   if (pronounFont) {
-    textFont(pronounFont);
+    textFont(
+      pronounFont,
+    );
   }
 
-  textSize(size);
+  textSize(
+    size,
+  );
 
   let width =
     getTrackedTextWidth(
@@ -2865,9 +2712,10 @@ function getTrackedTextWidth(
     i < textValue.length;
     i++
   ) {
-    total += textWidth(
-      textValue.charAt(i),
-    );
+    total +=
+      textWidth(
+        textValue.charAt(i),
+      );
 
     if (
       i <
@@ -2881,14 +2729,14 @@ function getTrackedTextWidth(
 }
 
 function drawHandCursor() {
-  let cursorSceneActive =
+  let activeScene =
     currentScene ===
       "scene02Choice" ||
     currentScene ===
       "scene06SeasonsChoice";
 
   if (
-    !cursorSceneActive ||
+    !activeScene ||
     !handCursor.visible
   ) {
     return;
@@ -3139,7 +2987,7 @@ function keyPressed() {
     );
   }
 
-  // בדיקות מהירות של בחירת עונות בלי יד
+  // בדיקות בחירת עונה בלי יד
   if (
     key === "q" &&
     currentScene ===
