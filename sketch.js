@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V08 - SCENE 02 CHOICE HOVER TEST");
+console.log("MIGO FLOW V09 - SCENE 02 CHOICE HOVER FIXES");
 
 let W = 1920;
 let H = 1080;
@@ -53,13 +53,16 @@ let handCursor = {
   visible: false
 };
 
-let cursorSize = 20;
+// גודל מחוון יד
+let cursorSize = 30;
 
+// טקסטים
 let pronounBaseSize = 240;
-let pronounHoverScale = 2;
+let pronounHoverScale = 1.5;
 let pronounTracking = -10;
 
-let pronounColor = [255, 255, 255];
+// #A8A1E1 באופסיטי 28%
+let pronounColor = [168, 161, 225, 71];
 
 let hoverScales = {
   he: 1,
@@ -785,6 +788,8 @@ function drawCrossfade() {
 
   p = constrain(p, 0, 1);
 
+  // הסרטון היוצא נשאר מלא, והיעד עולה מעליו.
+  // זה מונע נפילה לשחור.
   drawVideo(fromVideoId, 1);
 
   if (toSceneId === "scene02Choice") {
@@ -830,14 +835,22 @@ function drawScene02Choice(alpha = 1) {
     firstFrameShown = true;
   }
 
+  // שכבת רקע
+  drawVideo("scene02Background", alpha);
+
+  // טקסטים בין שתי שכבות הווידאו
   drawingContext.save();
   drawingContext.globalAlpha = alpha;
-
-  drawVideo("scene02Background", 1);
   drawPronounTexts();
-  drawVideo("scene02BlobLoop", 1);
-  drawHandCursor();
+  drawingContext.restore();
 
+  // הבלוב מעל הטקסטים
+  drawVideo("scene02BlobLoop", alpha);
+
+  // מחוון יד מעל הכול
+  drawingContext.save();
+  drawingContext.globalAlpha = alpha;
+  drawHandCursor();
   drawingContext.restore();
 }
 
@@ -877,7 +890,13 @@ function drawPronounWord(keyName) {
   let currentSize = pronounBaseSize * hoverScales[keyName];
 
   textSize(currentSize);
-  fill(pronounColor[0], pronounColor[1], pronounColor[2]);
+
+  fill(
+    pronounColor[0],
+    pronounColor[1],
+    pronounColor[2],
+    pronounColor[3]
+  );
 
   drawTrackedCenteredText(
     pos.label,
