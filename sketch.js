@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V17 - VOICE SCAN ANSWER TO SEASONS");
+console.log("MIGO FLOW V18 - VOICE SCAN ANSWER DELAY TO SEASONS");
 
 let W = 1920;
 let H = 1080;
@@ -89,6 +89,11 @@ let voiceLoopEnteredAt = 0;
 let voiceElementTriggered = false;
 let voiceElementPlaying = false;
 let voiceElementActive = false;
+
+// דיליי קטן בין אלמנט הסריקה לבין סרטון התשובה
+let voiceAnsDelayActive = false;
+let voiceAnsDelayStartedAt = 0;
+let voiceAnsDelayMs = 650;
 
 let mouthPrevRatio = null;
 let mouthBaselineRatio = null;
@@ -941,6 +946,9 @@ function resetVoiceScanState() {
   voiceElementPlaying = false;
   voiceElementActive = false;
 
+  voiceAnsDelayActive = false;
+  voiceAnsDelayStartedAt = 0;
+
   mouthPrevRatio = null;
   mouthBaselineRatio = null;
   mouthActivityFrames = 0;
@@ -1066,6 +1074,9 @@ function triggerVoiceScanElement(reason = "unknown") {
   voiceElementPlaying = true;
   voiceElementActive = true;
 
+  voiceAnsDelayActive = false;
+  voiceAnsDelayStartedAt = 0;
+
   video.el.loop = false;
   applyAudioState("scene05ScanVoiceElement", 0);
 
@@ -1086,9 +1097,22 @@ function checkVoiceElementEnd() {
   let video = videos.scene05ScanVoiceElement;
   if (!video || !video.el.duration) return;
 
-  let timeLeft = video.el.duration - video.el.currentTime;
+  let elementHasEnded =
+    video.el.ended ||
+    video.el.currentTime >= video.el.duration - 0.05;
 
-  if (timeLeft <= crossfadeDuration) {
+  // ברגע שהאלמנט נגמר — מתחילים לספור דיליי
+  if (!voiceAnsDelayActive && elementHasEnded) {
+    voiceAnsDelayActive = true;
+    voiceAnsDelayStartedAt = millis();
+    return;
+  }
+
+  // אחרי הדיליי — עוברים לסרטון התשובה
+  if (
+    voiceAnsDelayActive &&
+    millis() - voiceAnsDelayStartedAt >= voiceAnsDelayMs
+  ) {
     voiceElementPlaying = false;
     startCrossfade("scene05VoiceLoop", "scene05ScanVoiceAns");
   }
