@@ -12,7 +12,7 @@ let videos = {};
 // סאונד חיצוני ל־Voice Scan
 let voiceScanSound;
 const VOICE_SCAN_SOUND_SRC = "assets/sound/sound_scan.mp3";
-const VOICE_SCAN_SOUND_VOLUME = 0.35;
+const VOICE_SCAN_SOUND_VOLUME = 0.25;
 
 let currentScene = "logoLoop";
 let firstFrameShown = false;
