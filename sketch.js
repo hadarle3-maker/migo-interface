@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V11 - SCENE 03 LOVE FACE TRANSITIONS");
+console.log("MIGO FLOW V12 - VOICE SCAN MOUTH MOVEMENT");
 
 let W = 1920;
 let H = 1080;
@@ -79,6 +79,21 @@ let hoverScales = {
 };
 
 let showPositionDots = false;
+
+// זיהוי תנועת פה ל־Voice Scan
+let voiceLoopEnteredAt = 0;
+let voiceElementTriggered = false;
+let voiceElementPlaying = false;
+let voiceElementActive = false;
+
+let mouthPrevRatio = null;
+let mouthActivityFrames = 0;
+
+// רגישות זיהוי פה
+let mouthOpenThreshold = 0.055;
+let mouthMovementDeltaThreshold = 0.006;
+let mouthActivityFramesNeeded = 5;
+let voiceDetectionDelay = 700;
 
 const VIDEO_FILES = {
   logoLoop: {
@@ -187,6 +202,42 @@ const VIDEO_FILES = {
     customLoop: false,
     startAt: 0,
     endTrim: 0
+  },
+
+  scene05ScanVoiceOnly: {
+    src: "assets/videos/secen_05_scan_voice_only.mp4",
+    volume: 1,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
+  },
+
+  scene05ScanVoiceBackground: {
+    src: "assets/videos/secen_05_scan_voice_background.mp4",
+    volume: 0,
+    loop: true,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
+  },
+
+  scene05ScanVoiceElement: {
+    src: "assets/videos/secen_05_scan_voice_element.webm",
+    volume: 0,
+    loop: false,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
+  },
+
+  scene05ScanVoiceBlob: {
+    src: "assets/videos/secen_05_scan_voice_blob.webm",
+    volume: 0,
+    loop: true,
+    customLoop: false,
+    startAt: 0,
+    endTrim: 0
   }
 };
 
@@ -214,12 +265,6 @@ const PRONOUN_ANSWER_VIDEOS = {
   he: "scene02AnsHe",
   she: "scene02AnsShe",
   they: "scene02AnsThey"
-};
-
-const ANSWER_TO_LOVE_FACE_VIDEOS = {
-  scene02AnsShe: "scene03SheToLoveFace",
-  scene02AnsHe: "scene03HeToLoveFace",
-  scene02AnsThey: "scene03TheyToLoveFace"
 };
 
 function preload() {
@@ -382,6 +427,37 @@ function playScene(id) {
     return;
   }
 
+  if (id === "scene05VoiceLoop") {
+    currentScene = id;
+    isCrossfading = false;
+    activeTransition = null;
+
+    stopAllVideos();
+    startScene05VoiceLoopVideos(true);
+
+    if (!firstFrameShown) {
+      cnv.elt.style.visibility = "visible";
+      firstFrameShown = true;
+    }
+
+    return;
+  }
+
+  if (id === "successScreen") {
+    currentScene = id;
+    isCrossfading = false;
+    activeTransition = null;
+
+    stopAllVideos();
+
+    if (!firstFrameShown) {
+      cnv.elt.style.visibility = "visible";
+      firstFrameShown = true;
+    }
+
+    return;
+  }
+
   let video = videos[id];
 
   if (!video) {
@@ -415,6 +491,25 @@ function startScene02ChoiceVideos(resetToStart) {
 function stopScene02ChoiceVideos() {
   stopSingleVideo("scene02Background");
   stopSingleVideo("scene02BlobLoop");
+}
+
+function startScene05VoiceLoopVideos(resetToStart) {
+  startLayerLoopVideo("scene05ScanVoiceBackground", resetToStart);
+  startLayerLoopVideo("scene05ScanVoiceBlob", resetToStart);
+
+  if (resetToStart) {
+    stopSingleVideo("scene05ScanVoiceElement");
+    resetVoiceScanState();
+  }
+
+  voiceLoopEnteredAt = millis();
+}
+
+function stopScene05VoiceLoopVideos() {
+  stopSingleVideo("scene05ScanVoiceBackground");
+  stopSingleVideo("scene05ScanVoiceElement");
+  stopSingleVideo("scene05ScanVoiceBlob");
+  resetVoiceScanState();
 }
 
 function stopSingleVideo(id) {
@@ -529,6 +624,10 @@ function updateInteraction() {
 
   if (currentScene === "scene02Choice" && !isCrossfading) {
     detectPronounSelection();
+  }
+
+  if (currentScene === "scene05VoiceLoop" && !isCrossfading) {
+    detectMouthMovementForVoiceScan();
   }
 }
 
@@ -746,6 +845,141 @@ function getHoveredPronounKey() {
   return "";
 }
 
+/* -----------------------------
+   VOICE SCAN BY MOUTH MOVEMENT
+----------------------------- */
+
+function resetVoiceScanState() {
+  voiceElementTriggered = false;
+  voiceElementPlaying = false;
+  voiceElementActive = false;
+
+  mouthPrevRatio = null;
+  mouthActivityFrames = 0;
+}
+
+function detectMouthMovementForVoiceScan() {
+  if (voiceElementTriggered) return;
+  if (millis() - voiceLoopEnteredAt < voiceDetectionDelay) return;
+
+  if (faces.length === 0) {
+    mouthPrevRatio = null;
+    mouthActivityFrames = 0;
+    return;
+  }
+
+  let face = faces[0];
+  let ratio = getMouthOpenRatio(face);
+
+  if (ratio === null) {
+    mouthPrevRatio = null;
+    mouthActivityFrames = 0;
+    return;
+  }
+
+  let movement = 0;
+
+  if (mouthPrevRatio !== null) {
+    movement = abs(ratio - mouthPrevRatio);
+  }
+
+  let mouthLooksActive =
+    ratio > mouthOpenThreshold || movement > mouthMovementDeltaThreshold;
+
+  if (mouthLooksActive) {
+    mouthActivityFrames++;
+  } else {
+    mouthActivityFrames = max(0, mouthActivityFrames - 1);
+  }
+
+  mouthPrevRatio = ratio;
+
+  if (mouthActivityFrames >= mouthActivityFramesNeeded) {
+    triggerVoiceScanElement("mouth movement");
+  }
+}
+
+function getMouthOpenRatio(face) {
+  let upperLip = getFacePoint(face, 13);
+  let lowerLip = getFacePoint(face, 14);
+  let mouthLeft = getFacePoint(face, 61);
+  let mouthRight = getFacePoint(face, 291);
+
+  if (!upperLip || !lowerLip || !mouthLeft || !mouthRight) {
+    return null;
+  }
+
+  let mouthOpen = dist(upperLip.x, upperLip.y, lowerLip.x, lowerLip.y);
+  let mouthWidth = dist(mouthLeft.x, mouthLeft.y, mouthRight.x, mouthRight.y);
+
+  if (mouthWidth <= 0) return null;
+
+  return mouthOpen / mouthWidth;
+}
+
+function getFacePoint(face, index) {
+  if (face.keypoints && face.keypoints[index]) {
+    return face.keypoints[index];
+  }
+
+  if (face.landmarks && face.landmarks[index]) {
+    return {
+      x: face.landmarks[index][0],
+      y: face.landmarks[index][1]
+    };
+  }
+
+  return null;
+}
+
+function triggerVoiceScanElement(reason = "unknown") {
+  if (currentScene !== "scene05VoiceLoop") return;
+  if (isCrossfading) return;
+  if (voiceElementTriggered) return;
+
+  let video = videos.scene05ScanVoiceElement;
+
+  if (!video) {
+    console.log("Missing voice scan element video");
+    return;
+  }
+
+  console.log("VOICE SCAN ELEMENT TRIGGERED BY:", reason);
+
+  voiceElementTriggered = true;
+  voiceElementPlaying = true;
+  voiceElementActive = true;
+
+  video.el.loop = false;
+  applyAudioState("scene05ScanVoiceElement", 0);
+
+  try {
+    video.el.currentTime = 0;
+  } catch (e) {}
+
+  video.el.play().catch(function (err) {
+    console.log("VOICE ELEMENT PLAY FAILED:", err);
+  });
+}
+
+function checkVoiceElementEnd() {
+  if (!voiceElementPlaying) return;
+
+  let video = videos.scene05ScanVoiceElement;
+  if (!video || !video.el.duration) return;
+
+  let timeLeft = video.el.duration - video.el.currentTime;
+
+  if (timeLeft <= crossfadeDuration) {
+    voiceElementPlaying = false;
+    startCrossfade("scene05VoiceLoop", "successScreen");
+  }
+}
+
+/* -----------------------------
+   HAND STATE
+----------------------------- */
+
 function getHandOpenCloseState(hand) {
   let wrist = getHandPoint(hand, 0);
 
@@ -840,6 +1074,26 @@ function checkAutoTransition() {
   if (currentScene === "scene02AnsThey") {
     checkVideoEndForCrossfade("scene02AnsThey", "scene03TheyToLoveFace");
   }
+
+  if (currentScene === "scene03SheToLoveFace") {
+    checkVideoEndForCrossfade("scene03SheToLoveFace", "scene05ScanVoiceOnly");
+  }
+
+  if (currentScene === "scene03HeToLoveFace") {
+    checkVideoEndForCrossfade("scene03HeToLoveFace", "scene05ScanVoiceOnly");
+  }
+
+  if (currentScene === "scene03TheyToLoveFace") {
+    checkVideoEndForCrossfade("scene03TheyToLoveFace", "scene05ScanVoiceOnly");
+  }
+
+  if (currentScene === "scene05ScanVoiceOnly") {
+    checkVideoEndForCrossfade("scene05ScanVoiceOnly", "scene05VoiceLoop");
+  }
+
+  if (currentScene === "scene05VoiceLoop") {
+    checkVoiceElementEnd();
+  }
 }
 
 function checkVideoEndForCrossfade(fromSceneId, toSceneId) {
@@ -862,10 +1116,14 @@ function checkVideoEndForCrossfade(fromSceneId, toSceneId) {
 function startCrossfade(fromSceneId, toSceneId) {
   if (isCrossfading) return;
 
-  let fromIsChoice = fromSceneId === "scene02Choice";
+  let fromIsLayerScene =
+    fromSceneId === "scene02Choice" ||
+    fromSceneId === "scene05VoiceLoop" ||
+    fromSceneId === "successScreen";
+
   let fromIsVideo = !!videos[fromSceneId];
 
-  if (!fromIsChoice && !fromIsVideo) {
+  if (!fromIsLayerScene && !fromIsVideo) {
     console.log("Missing crossfade from scene:", fromSceneId);
     return;
   }
@@ -881,6 +1139,15 @@ function startCrossfade(fromSceneId, toSceneId) {
 
   if (toSceneId === "scene02Choice") {
     startScene02ChoiceVideos(true);
+    return;
+  }
+
+  if (toSceneId === "scene05VoiceLoop") {
+    startScene05VoiceLoopVideos(true);
+    return;
+  }
+
+  if (toSceneId === "successScreen") {
     return;
   }
 
@@ -910,6 +1177,19 @@ function isTransitionTargetReady(toSceneId) {
     );
   }
 
+  if (toSceneId === "scene05VoiceLoop") {
+    return (
+      videos.scene05ScanVoiceBackground &&
+      videos.scene05ScanVoiceBlob &&
+      videos.scene05ScanVoiceBackground.el.readyState > 0 &&
+      videos.scene05ScanVoiceBlob.el.readyState > 0
+    );
+  }
+
+  if (toSceneId === "successScreen") {
+    return true;
+  }
+
   if (videos[toSceneId]) {
     return videos[toSceneId].el.readyState > 0;
   }
@@ -927,6 +1207,10 @@ function finishCrossfade() {
     stopScene02ChoiceVideos();
   }
 
+  if (fromSceneId === "scene05VoiceLoop") {
+    stopScene05VoiceLoopVideos();
+  }
+
   if (videos[fromSceneId]) {
     videos[fromSceneId].el.pause();
     videos[fromSceneId].el.volume = 0;
@@ -936,6 +1220,10 @@ function finishCrossfade() {
 
   if (toSceneId === "scene02Choice") {
     startScene02ChoiceVideos(false);
+  }
+
+  if (toSceneId === "scene05VoiceLoop") {
+    startScene05VoiceLoopVideos(false);
   }
 
   if (videos[toSceneId]) {
@@ -958,6 +1246,16 @@ function drawCurrentScene() {
 
   if (currentScene === "scene02Choice") {
     drawScene02Choice(1, true);
+    return;
+  }
+
+  if (currentScene === "scene05VoiceLoop") {
+    drawScene05VoiceLoop(1);
+    return;
+  }
+
+  if (currentScene === "successScreen") {
+    drawSuccessScreen(1);
     return;
   }
 
@@ -1012,6 +1310,16 @@ function drawSceneById(sceneId, alpha = 1, showCursor = true) {
     return;
   }
 
+  if (sceneId === "scene05VoiceLoop") {
+    drawScene05VoiceLoop(alpha);
+    return;
+  }
+
+  if (sceneId === "successScreen") {
+    drawSuccessScreen(alpha);
+    return;
+  }
+
   drawVideo(sceneId, alpha);
 }
 
@@ -1058,6 +1366,41 @@ function drawScene02Choice(alpha = 1, showCursor = true) {
     drawHandCursor();
     drawingContext.restore();
   }
+}
+
+function drawScene05VoiceLoop(alpha = 1) {
+  if (!firstFrameShown) {
+    cnv.elt.style.visibility = "visible";
+    firstFrameShown = true;
+  }
+
+  // שכבה 1 — רקע
+  drawVideo("scene05ScanVoiceBackground", alpha);
+
+  // שכבה 2 — אלמנט שמופעל רק אחרי תנועת פה
+  if (voiceElementActive) {
+    drawVideo("scene05ScanVoiceElement", alpha);
+  }
+
+  // שכבה 3 — בלוב
+  drawVideo("scene05ScanVoiceBlob", alpha);
+}
+
+function drawSuccessScreen(alpha = 1) {
+  drawingContext.save();
+  drawingContext.globalAlpha = alpha;
+
+  background(255);
+
+  push();
+  fill(0);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(120);
+  text("sucsses", W / 2, H / 2);
+  pop();
+
+  drawingContext.restore();
 }
 
 function drawPronounTexts() {
@@ -1262,6 +1605,16 @@ function keyPressed() {
 
   if (key === "3" && currentScene === "scene02Choice") {
     selectPronoun("they");
+  }
+
+  // V מדמה דיבור במסך Voice Scan
+  if (key === "v" || key === "V") {
+    triggerVoiceScanElement("debug key");
+  }
+
+  // קיצור בדיקה למסך הלופ של Voice Scan
+  if (key === "5") {
+    playScene("scene05VoiceLoop");
   }
 }
 
