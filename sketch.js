@@ -28,6 +28,7 @@ let isCrossfading = false;
 let activeTransition = null;
 const crossfadeDuration = 0.65;
 const seasonLoopCrossfadeDuration = 0.50;
+const seasonsIntroCrossfadeDuration = 0.50;
 
 // פתיחת אודיו באמצעות זיהוי פנים
 let faceSeenSince = 0;
@@ -264,7 +265,7 @@ const VIDEO_FILES = {
     volume: 1,
     loop: false,
     startAt: 0,
-    endTrim: 0.18,
+    endTrim: 0,
   },
 
   scene06SeasonsBackground: {
@@ -453,8 +454,9 @@ const AUTO_TRANSITIONS = {
   },
 
   scene06SeasonsIntro: {
-    to: "scene06SeasonsChoice",
-  },
+  to: "scene06SeasonsChoice",
+  duration: seasonsIntroCrossfadeDuration,
+},
 
   // קרוס־פייד ייעודי בין סרטוני ה־in ללופים
   scene06SummerIn: {
