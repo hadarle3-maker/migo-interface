@@ -1,4 +1,4 @@
-console.log("MIGO FLOW V13 - VOICE SCAN WITH SOUND");
+console.log("MIGO FLOW V14 - VOICE SCAN BALANCED MOUTH DETECTION");
 
 let W = 1920;
 let H = 1080;
@@ -91,13 +91,16 @@ let voiceElementPlaying = false;
 let voiceElementActive = false;
 
 let mouthPrevRatio = null;
+let mouthBaselineRatio = null;
 let mouthActivityFrames = 0;
+let mouthDebugCounter = 0;
 
-// רגישות זיהוי פה
+// רגישות זיהוי פה — גרסה מאוזנת
 let mouthOpenThreshold = 0.055;
-let mouthMovementDeltaThreshold = 0.014;
-let mouthActivityFramesNeeded = 12;
-let voiceDetectionDelay = 2000;
+let mouthMovementDeltaThreshold = 0.005;
+let mouthOpenAboveBaselineThreshold = 0.018;
+let mouthActivityFramesNeeded = 6;
+let voiceDetectionDelay = 1500;
 
 const VIDEO_FILES = {
   logoLoop: {
@@ -921,7 +924,9 @@ function resetVoiceScanState() {
   voiceElementActive = false;
 
   mouthPrevRatio = null;
+  mouthBaselineRatio = null;
   mouthActivityFrames = 0;
+  mouthDebugCounter = 0;
 }
 
 function detectMouthMovementForVoiceScan() {
@@ -934,6 +939,7 @@ function detectMouthMovementForVoiceScan() {
   // אם אין פנים — מאפסים
   if (faces.length === 0) {
     mouthPrevRatio = null;
+    mouthBaselineRatio = null;
     mouthActivityFrames = 0;
     return;
   }
@@ -944,43 +950,61 @@ function detectMouthMovementForVoiceScan() {
   // אם לא הצלחנו לקרוא את הפה — מאפסים
   if (ratio === null) {
     mouthPrevRatio = null;
+    mouthBaselineRatio = null;
     mouthActivityFrames = 0;
     return;
   }
 
-  // בפריים הראשון רק שומרים ערך, לא מפעילים כלום
+  // בפריים הראשון יוצרים נקודת בסיס של מצב הפה
   if (mouthPrevRatio === null) {
     mouthPrevRatio = ratio;
+    mouthBaselineRatio = ratio;
     mouthActivityFrames = 0;
     return;
   }
 
-  // בודקים רק שינוי בין פריים לפריים
-  // לא מפעילים לפי זה שהפה "פתוח", אלא רק לפי תנועה
+  // כמה הפה השתנה מהפריים הקודם
   let movement = abs(ratio - mouthPrevRatio);
 
+  // כמה הפה נפתח ביחס למצב הבסיס שלו
+  let openAboveBaseline = ratio - mouthBaselineRatio;
+
+  // דיבור = או תנועה קטנה שחוזרת על עצמה
+  // או פתיחה ברורה ביחס למצב הפה ההתחלתי
   let mouthLooksActive =
-    movement > mouthMovementDeltaThreshold;
+    movement > mouthMovementDeltaThreshold ||
+    openAboveBaseline > mouthOpenAboveBaselineThreshold;
 
   if (mouthLooksActive) {
     mouthActivityFrames++;
   } else {
     mouthActivityFrames = max(0, mouthActivityFrames - 1);
+
+    // כשהפה רגוע, מעדכנים לאט את מצב הבסיס
+    // כדי שזה לא ייתקע על ערך לא נכון
+    mouthBaselineRatio = lerp(mouthBaselineRatio, ratio, 0.03);
   }
 
   mouthPrevRatio = ratio;
 
-  // לוג זמני לבדיקה — אפשר למחוק אחר כך
-  console.log(
-    "mouth ratio:",
-    ratio,
-    "movement:",
-    movement,
-    "frames:",
-    mouthActivityFrames
-  );
+  // לוג זמני לבדיקה — אפשר למחוק אחרי שזה עובד
+  mouthDebugCounter++;
+  if (mouthDebugCounter % 10 === 0) {
+    console.log(
+      "mouth ratio:",
+      ratio,
+      "movement:",
+      movement,
+      "baseline:",
+      mouthBaselineRatio,
+      "above baseline:",
+      openAboveBaseline,
+      "frames:",
+      mouthActivityFrames
+    );
+  }
 
-  // רק אחרי כמה פריימים של תנועה אמיתית מפעילים
+  // רק אחרי כמה פריימים של פעילות מפעילים
   if (mouthActivityFrames >= mouthActivityFramesNeeded) {
     triggerVoiceScanElement("mouth movement");
   }
