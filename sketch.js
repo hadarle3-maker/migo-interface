@@ -1,3 +1,5 @@
+console.log("MIGO CLEAN FLOW V02");
+
 let W = 1920;
 let H = 1080;
 
@@ -11,6 +13,9 @@ let crossfadeStartTime = 0;
 let crossfadeDuration = 0.9;
 let crossfadeLead = 0.18;
 let activeTransition = null;
+
+// סאונד
+let audioUnlocked = false;
 
 // מצלמה / ידיים
 let handPose;
@@ -28,19 +33,19 @@ let gestureCooldown = 1400;
 const VIDEO_FILES = {
   logoLoop: {
     src: "assets/videos/logo_loop.mp4",
-    volume: 0,
+    volume: 1,
     loop: true
   },
 
   logoToScene01: {
     src: "assets/videos/logo_to_secen_01.mp4",
-    volume: 0,
+    volume: 1,
     loop: false
   },
 
   scene01: {
     src: "assets/videos/secen_01.mp4",
-    volume: 0,
+    volume: 1,
     loop: false
   }
 };
@@ -116,6 +121,46 @@ function createVideoElement(id, src) {
   };
 }
 
+/* -----------------------------
+   AUDIO
+----------------------------- */
+
+function unlockAudio() {
+  if (audioUnlocked) return;
+
+  audioUnlocked = true;
+
+  for (let id in videos) {
+    let video = videos[id];
+    let volumeLevel = VIDEO_FILES[id].volume;
+
+    video.el.muted = false;
+    video.el.removeAttribute("muted");
+    video.el.volume = volumeLevel;
+  }
+
+  console.log("AUDIO UNLOCKED");
+}
+
+function applyAudioState(id) {
+  let video = videos[id];
+
+  if (!video) return;
+
+  if (audioUnlocked) {
+    video.el.muted = false;
+    video.el.removeAttribute("muted");
+    video.el.volume = VIDEO_FILES[id].volume;
+  } else {
+    video.el.muted = true;
+    video.el.volume = 0;
+  }
+}
+
+/* -----------------------------
+   PLAYBACK
+----------------------------- */
+
 function playScene(id, loopIt = false) {
   let video = videos[id];
 
@@ -131,8 +176,7 @@ function playScene(id, loopIt = false) {
   stopAllVideos();
 
   video.el.loop = loopIt;
-  video.el.muted = true;
-  video.el.volume = 0;
+  applyAudioState(id);
 
   try {
     video.el.currentTime = 0;
@@ -220,6 +264,10 @@ function detectOpenCloseHandToContinue() {
         openSince = 0;
         closedSince = 0;
 
+        // הערה חשובה:
+        // סגירת יד לא תמיד נחשבת בדפדפן כאינטראקציה אמיתית לפתיחת סאונד.
+        // לכן לבדיקת סאונד בטוחה — להשתמש ברווח / קליק.
+        unlockAudio();
         playScene("logoToScene01", false);
       }
     } else {
@@ -317,6 +365,8 @@ function checkVideoEndForCrossfade(fromVideoId, toVideoId) {
 }
 
 function startCrossfade(fromVideoId, toVideoId) {
+  if (isCrossfading) return;
+
   isCrossfading = true;
   crossfadeStartTime = millis();
 
@@ -327,9 +377,13 @@ function startCrossfade(fromVideoId, toVideoId) {
 
   let toVideo = videos[toVideoId];
 
-  toVideo.el.loop = false;
-  toVideo.el.muted = true;
-  toVideo.el.volume = 0;
+  if (!toVideo) {
+    console.log("Missing next video:", toVideoId);
+    return;
+  }
+
+  toVideo.el.loop = VIDEO_FILES[toVideoId].loop;
+  applyAudioState(toVideoId);
 
   try {
     toVideo.el.currentTime = 0;
@@ -351,6 +405,10 @@ function finishCrossfade() {
   }
 
   currentScene = toVideoId;
+
+  if (videos[toVideoId]) {
+    applyAudioState(toVideoId);
+  }
 
   isCrossfading = false;
   activeTransition = null;
@@ -375,8 +433,21 @@ function drawCrossfade() {
   let p = (millis() - crossfadeStartTime) / (crossfadeDuration * 1000);
   p = constrain(p, 0, 1);
 
-  drawVideo(activeTransition.fromVideoId, 1 - p);
-  drawVideo(activeTransition.toVideoId, p);
+  let fromVideoId = activeTransition.fromVideoId;
+  let toVideoId = activeTransition.toVideoId;
+
+  if (audioUnlocked) {
+    if (videos[fromVideoId]) {
+      videos[fromVideoId].el.volume = VIDEO_FILES[fromVideoId].volume * (1 - p);
+    }
+
+    if (videos[toVideoId]) {
+      videos[toVideoId].el.volume = VIDEO_FILES[toVideoId].volume * p;
+    }
+  }
+
+  drawVideo(fromVideoId, 1 - p);
+  drawVideo(toVideoId, p);
 
   if (p >= 1) {
     finishCrossfade();
@@ -428,19 +499,31 @@ function windowResized() {
 }
 
 /* -----------------------------
-   DEBUG SHORTCUTS
+   DEBUG / USER INTERACTION
 ----------------------------- */
 
-// רווח מדמה סגירת יד כדי לבדוק מהר בלי מצלמה
+// רווח: פותח סאונד ומדמה סגירת יד
 function keyPressed() {
   if (key === " " && currentScene === "logoLoop") {
+    unlockAudio();
     playScene("logoToScene01", false);
   }
 }
 
-// קליק גם מפעיל מעבר לבדיקה
+// קליק: פותח סאונד ומדמה סגירת יד
 function mousePressed() {
   if (currentScene === "logoLoop") {
+    unlockAudio();
     playScene("logoToScene01", false);
   }
+}
+
+// לטאבלט / טאץ'
+function touchStarted() {
+  if (currentScene === "logoLoop") {
+    unlockAudio();
+    playScene("logoToScene01", false);
+  }
+
+  return false;
 }
