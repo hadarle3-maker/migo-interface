@@ -54,11 +54,11 @@ let handCursor = {
 };
 
 // גודל מחוון יד
-let cursorSize = 30;
+let cursorSize = 40;
 
 // טקסטים
 let pronounBaseSize = 240;
-let pronounHoverScale = 1.5;
+let pronounHoverScale = 1.3;
 let pronounTracking = -10;
 
 // #A8A1E1 באופסיטי 28%
@@ -132,19 +132,19 @@ const PRONOUN_POSITIONS = {
   he: {
     label: "He",
     x: 593.5599,
-    y: 430
+    y: 435
   },
 
   she: {
     label: "She",
     x: 1389.5729,
-    y: 450
+    y: 455
   },
 
   they: {
     label: "They",
     x: 958.8,
-    y: 160
+    y: 165
   }
 };
 
