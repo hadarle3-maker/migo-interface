@@ -90,19 +90,19 @@ const PRONOUN_POSITIONS = {
   he: {
     label: "He",
     x: 593.5599,
-    y: 511.3138
+    y: 480
   },
 
   she: {
     label: "She",
     x: 1389.5729,
-    y: 538.079
+    y: 500
   },
 
   they: {
     label: "They",
     x: 958.8,
-    y: 253.2852
+    y: 200
   }
 };
 
