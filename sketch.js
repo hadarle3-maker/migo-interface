@@ -100,12 +100,12 @@ const arrowHoverScale = 1.3;
 const ARROW_POSITIONS = {
   prev: {
     x: 110,
-    y: H / 2,
+    y: H / 2 - 80,
   },
 
   next: {
     x: W - 110,
-    y: H / 2,
+    y: H / 2 - 80,
   },
 };
 
@@ -3229,12 +3229,12 @@ function drawSeasonArrows() {
 
   drawSeasonArrow(
     "prev",
-    false
+    true
   );
 
   drawSeasonArrow(
     "next",
-    true
+    false
   );
 }
 
