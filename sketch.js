@@ -10,41 +10,24 @@ let isCrossfading = false;
 let crossfadeStartTime = 0;
 let crossfadeDuration = 0.9;
 let crossfadeLead = 0.18;
-
 let activeTransition = null;
-
-let handPose;
-let webcam;
-let hands = [];
-
-let gesturePhase = "waitingOpen";
-let openSince = 0;
-let closedSince = 0;
-let openHoldTime = 350;
-let closedHoldTime = 250;
-let lastHandGestureTime = 0;
-let gestureCooldown = 1400;
 
 const VIDEO_FILES = {
   logoLoop: {
     src: "assets/videos/logo_loop.mp4",
-    volume: 1
+    volume: 0
   },
 
   logoToScene01: {
     src: "assets/videos/logo_to_secen_01.mp4",
-    volume: 1
+    volume: 0
   },
 
   scene01: {
     src: "assets/videos/secen_01.mp4",
-    volume: 1
+    volume: 0
   }
 };
-
-function preload() {
-  handPose = ml5.handPose({ maxHands: 1 });
-}
 
 function setup() {
   cnv = createCanvas(W, H);
@@ -52,8 +35,6 @@ function setup() {
   fitCanvasToWindow();
 
   loadVideos();
-  setupCamera();
-
   playLogoLoop();
 }
 
@@ -63,7 +44,6 @@ function draw() {
   drawingContext.imageSmoothingEnabled = true;
   drawingContext.imageSmoothingQuality = "high";
 
-  updateCameraInteraction();
   checkAutoTransition();
   drawCurrentScene();
 }
@@ -99,149 +79,15 @@ function createVideoElement(id, src, volumeLevel) {
 
   video.el.load();
 
-  return video;
-}
-
-function setupCamera() {
-  webcam = createCapture({
-    video: {
-      width: 640,
-      height: 360
-    },
-    audio: false
+  video.el.addEventListener("error", function () {
+    console.log("VIDEO ERROR:", id, src, video.el.error);
   });
 
-  webcam.hide();
+  video.el.addEventListener("loadeddata", function () {
+    console.log("VIDEO LOADED:", id, src);
+  });
 
-  handPose.detectStart(webcam, gotHands);
-}
-
-function gotHands(results) {
-  hands = results;
-}
-
-function updateCameraInteraction() {
-  if (currentScene === "logoLoop") {
-    detectOpenCloseHandToContinue();
-  }
-}
-
-function detectOpenCloseHandToContinue() {
-  if (currentScene !== "logoLoop") return;
-  if (isCrossfading) return;
-
-  if (hands.length === 0) {
-    gesturePhase = "waitingOpen";
-    openSince = 0;
-    closedSince = 0;
-    return;
-  }
-
-  let hand = hands[0];
-  let state = getHandOpenCloseState(hand);
-  let now = millis();
-
-  if (gesturePhase === "waitingOpen") {
-    if (state === "open") {
-      if (openSince === 0) {
-        openSince = now;
-      }
-
-      if (now - openSince > openHoldTime) {
-        gesturePhase = "waitingClosed";
-        closedSince = 0;
-      }
-    } else {
-      openSince = 0;
-    }
-  }
-
-  if (gesturePhase === "waitingClosed") {
-    if (state === "closed") {
-      if (closedSince === 0) {
-        closedSince = now;
-      }
-
-      if (
-        now - closedSince > closedHoldTime &&
-        now - lastHandGestureTime > gestureCooldown
-      ) {
-        lastHandGestureTime = now;
-
-        gesturePhase = "waitingOpen";
-        openSince = 0;
-        closedSince = 0;
-
-        playLogoToScene01();
-      }
-    } else {
-      closedSince = 0;
-    }
-  }
-}
-
-function getHandOpenCloseState(hand) {
-  let wrist = getHandPoint(hand, 0);
-
-  let indexTip = getHandPoint(hand, 8);
-  let indexPip = getHandPoint(hand, 6);
-
-  let middleTip = getHandPoint(hand, 12);
-  let middlePip = getHandPoint(hand, 10);
-
-  let ringTip = getHandPoint(hand, 16);
-  let ringPip = getHandPoint(hand, 14);
-
-  let pinkyTip = getHandPoint(hand, 20);
-  let pinkyPip = getHandPoint(hand, 18);
-
-  if (
-    !wrist ||
-    !indexTip ||
-    !indexPip ||
-    !middleTip ||
-    !middlePip ||
-    !ringTip ||
-    !ringPip ||
-    !pinkyTip ||
-    !pinkyPip
-  ) {
-    return "unknown";
-  }
-
-  let extendedCount = 0;
-
-  if (isFingerExtended(wrist, indexTip, indexPip)) extendedCount++;
-  if (isFingerExtended(wrist, middleTip, middlePip)) extendedCount++;
-  if (isFingerExtended(wrist, ringTip, ringPip)) extendedCount++;
-  if (isFingerExtended(wrist, pinkyTip, pinkyPip)) extendedCount++;
-
-  if (extendedCount >= 3) return "open";
-  if (extendedCount <= 1) return "closed";
-
-  return "middle";
-}
-
-function isFingerExtended(wrist, tip, pip) {
-  let tipDist = dist(wrist.x, wrist.y, tip.x, tip.y);
-  let pipDist = dist(wrist.x, wrist.y, pip.x, pip.y);
-
-  return tipDist > pipDist * 1.08;
-}
-
-function getHandPoint(hand, index) {
-  if (hand.keypoints && hand.keypoints[index]) {
-    return hand.keypoints[index];
-  }
-
-  if (hand.landmarks && hand.landmarks[index]) {
-    return {
-      x: hand.landmarks[index][0],
-      y: hand.landmarks[index][1]
-    };
-  }
-
-  return null;
+  return video;
 }
 
 function playLogoLoop() {
@@ -251,18 +97,18 @@ function playLogoLoop() {
 
   stopAllVideos();
 
-  let logo = videos.logoLoop;
+  let video = videos.logoLoop;
 
-  logo.el.loop = true;
-  logo.el.muted = true;
-  logo.el.volume = 0;
+  video.el.loop = true;
+  video.el.muted = true;
+  video.el.volume = 0;
 
   try {
-    logo.el.currentTime = 0;
+    video.el.currentTime = 0;
   } catch (e) {}
 
-  logo.el.play().catch(function (err) {
-    console.log("Logo loop autoplay failed:", err);
+  video.el.play().catch(function (err) {
+    console.log("Logo loop play failed:", err);
   });
 }
 
@@ -273,10 +119,10 @@ function playLogoToScene01() {
 
   stopAllVideos();
 
-  playVideo("logoToScene01", false, videos.logoToScene01.volume);
+  playVideo("logoToScene01", false);
 }
 
-function playVideo(id, loopIt, volumeLevel) {
+function playVideo(id, loopIt) {
   let video = videos[id];
 
   if (!video) {
@@ -285,12 +131,8 @@ function playVideo(id, loopIt, volumeLevel) {
   }
 
   video.el.loop = loopIt;
-
-  // כרגע נשאיר סאונד פעיל אם הדפדפן מאפשר.
-  // אם יש חסימת סאונד, נתקן בשלב הבא.
-  video.el.removeAttribute("muted");
-  video.el.muted = false;
-  video.el.volume = volumeLevel;
+  video.el.muted = true;
+  video.el.volume = 0;
 
   try {
     video.el.currentTime = 0;
@@ -368,8 +210,7 @@ function startAutoCrossfade(
     }
 
     video.el.loop = loopTargets;
-    video.el.removeAttribute("muted");
-    video.el.muted = false;
+    video.el.muted = true;
     video.el.volume = 0;
 
     try {
@@ -377,7 +218,7 @@ function startAutoCrossfade(
     } catch (e) {}
 
     video.el.play().catch(function (err) {
-      console.log("Play failed:", id, err);
+      console.log("Play next failed:", id, err);
     });
   }
 }
@@ -385,24 +226,13 @@ function startAutoCrossfade(
 function finishCrossfade() {
   if (!activeTransition) return;
 
-  if (activeTransition.type === "videoToVideo") {
-    let fromVideoId = activeTransition.fromVideoId;
+  let fromVideoId = activeTransition.fromVideoId;
 
-    if (fromVideoId && videos[fromVideoId]) {
-      videos[fromVideoId].el.pause();
-      videos[fromVideoId].el.volume = videos[fromVideoId].volume;
-    }
-
-    for (let i = 0; i < activeTransition.toVideoIds.length; i++) {
-      let id = activeTransition.toVideoIds[i];
-
-      if (videos[id]) {
-        videos[id].el.volume = videos[id].volume;
-      }
-    }
-
-    currentScene = activeTransition.nextScene;
+  if (fromVideoId && videos[fromVideoId]) {
+    videos[fromVideoId].el.pause();
   }
+
+  currentScene = activeTransition.nextScene;
 
   isCrossfading = false;
   activeTransition = null;
@@ -415,8 +245,6 @@ function stopAllVideos() {
     try {
       videos[id].el.currentTime = 0;
     } catch (e) {}
-
-    videos[id].el.volume = videos[id].volume;
   }
 }
 
@@ -445,9 +273,7 @@ function drawCrossfade() {
   let p = (millis() - crossfadeStartTime) / (crossfadeDuration * 1000);
   p = constrain(p, 0, 1);
 
-  if (activeTransition.type === "videoToVideo") {
-    drawVideoToVideoCrossfade(p);
-  }
+  drawVideoToVideoCrossfade(p);
 
   if (p >= 1) {
     finishCrossfade();
@@ -457,9 +283,6 @@ function drawCrossfade() {
 function drawVideoToVideoCrossfade(p) {
   let fromVideoId = activeTransition.fromVideoId;
   let toVideoId = activeTransition.toVideoIds[0];
-
-  videos[fromVideoId].el.volume = videos[fromVideoId].volume * (1 - p);
-  videos[toVideoId].el.volume = videos[toVideoId].volume * p;
 
   drawVideo(fromVideoId, 1 - p);
   drawVideo(toVideoId, p);
@@ -494,10 +317,14 @@ function windowResized() {
   fitCanvasToWindow();
 }
 
-// בדיקת מעבר בלי מצלמה:
-// אפשר ללחוץ על רווח כדי לדמות סגירת יד.
 function keyPressed() {
   if (key === " " && currentScene === "logoLoop") {
+    playLogoToScene01();
+  }
+}
+
+function mousePressed() {
+  if (currentScene === "logoLoop") {
     playLogoToScene01();
   }
 }
