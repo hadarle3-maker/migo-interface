@@ -167,7 +167,7 @@ const PRONOUN_POSITIONS = {
   he: {
     label: "He",
     x: 593.5599,
-    y: 435
+    y: 430
   },
 
   she: {
