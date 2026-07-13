@@ -550,7 +550,7 @@ const VIDEO_FILES = {
   },
 
   scene07QaLoop: {
-    src: "assets/videos/secen 07 qa_loop.webm",
+    src: "assets/videos/scene_07_seasons_loop_new.webm",
     volume: 0,
     loop: true,
     startAt: 0,
