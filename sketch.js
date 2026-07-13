@@ -684,21 +684,21 @@ function drawPronounTexts() {
     PRONOUN_POSITIONS.he.label,
     PRONOUN_POSITIONS.he.x,
     PRONOUN_POSITIONS.he.y,
-    -20
+    -10
   );
 
   drawTrackedCenteredText(
     PRONOUN_POSITIONS.she.label,
     PRONOUN_POSITIONS.she.x,
     PRONOUN_POSITIONS.she.y,
-    -20
+    -10
   );
 
   drawTrackedCenteredText(
     PRONOUN_POSITIONS.they.label,
     PRONOUN_POSITIONS.they.x,
     PRONOUN_POSITIONS.they.y,
-    -20
+    -10
   );
 
   if (showPositionDots) {
