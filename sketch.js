@@ -528,7 +528,7 @@ const VIDEO_FILES = {
   scene06SpringLoop: {
     src:
       "assets/videos/secen_06_Seasons_spring_loop.mp4",
-    volume: 1,
+    volume: 0.5,
     loop: true,
     startAt: 0,
     endTrim: 0,
