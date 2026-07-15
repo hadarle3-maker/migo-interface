@@ -5173,14 +5173,18 @@ function keyPressed() {
     selectPronoun("she");
   }
 
-  if (
-    key === "3" &&
-    currentScene ===
-      "scene02Choice"
-  ) {
-    selectPronoun("they");
-  }
+if (key === "3") {
+  playScene(
+    "scene02Choice",
+  );
+}
 
+  if (key === "4") {
+  playScene(
+    "scene03SheToLoveFace",
+  );
+}
+  
   if (
     key === "v" ||
     key === "V"
