@@ -3702,55 +3702,9 @@ function updateChoiceTimeoutForScene(
 }
 
 function checkChoiceScreenTimeout() {
-  if (
-    !isTimedChoiceScene(
-      currentScene,
-    )
-  ) {
-    return false;
-  }
-
-  // גיבוי למקרה שנכנסנו למסך דרך קיצור בדיקה.
-  if (
-    choiceTimeoutSceneId !==
-      currentScene ||
-    choiceTimeoutStartedAt ===
-      0
-  ) {
-    updateChoiceTimeoutForScene(
-      currentScene,
-    );
-
-    return false;
-  }
-
-  if (
-    millis() -
-      choiceTimeoutStartedAt <
-      choiceScreenTimeoutMs
-  ) {
-    return false;
-  }
-
-  let timedOutScene =
-    currentScene;
-
-  console.log(
-    "CHOICE SCREEN TIMED OUT. RETURNING TO LOGO:",
-    timedOutScene,
-  );
-
-  // מאפסות את כל הבחירות והמחוות לפני החזרה להתחלה.
-  resetExperienceValues();
-
-  startCrossfade(
-    timedOutScene,
-    "logoLoop",
-    choiceTimeoutReturnCrossfadeDuration,
-  );
-
-  return true;
+  return false;
 }
+
 
 /* -----------------------------
    AUTO TRANSITIONS / CROSSFADE
