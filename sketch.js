@@ -3760,12 +3760,6 @@ function checkAutoTransition() {
   if (isCrossfading) return;
 
   if (
-    checkChoiceScreenTimeout()
-  ) {
-    return;
-  }
-
-  if (
     currentScene ===
     "scene05VoiceLoop"
   ) {
