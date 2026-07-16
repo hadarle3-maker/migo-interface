@@ -3760,6 +3760,13 @@ function checkChoiceScreenTimeout() {
 function checkAutoTransition() {
   if (isCrossfading) return;
 
+  // בודק בכל פריים האם עברו 30 שניות במסך בחירה
+  if (
+    checkChoiceScreenTimeout()
+  ) {
+    return;
+  }
+
   if (
     currentScene ===
     "scene05VoiceLoop"
